@@ -1,0 +1,2510 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🚀 토익 영단어 갤러그 - 배틀모드</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 50%, #0a0a15 100%);
+            color: white;
+        }
+
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .card {
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 20px;
+            padding: 25px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 100px rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo { font-size: 50px; text-align: center; margin-bottom: 10px; }
+        .title {
+            font-size: clamp(22px, 5vw, 28px);
+            text-align: center;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, #667eea, #f093fb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .btn-battle {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+        }
+        .btn:hover { transform: translateY(-2px); opacity: 0.95; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 13px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            font-size: 16px;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* 모드 선택 버튼 */
+        .mode-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 20px 10px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 15px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .mode-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .mode-btn.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+        .mode-btn.battle.selected {
+            border-color: #f093fb;
+            background: rgba(240, 147, 251, 0.2);
+        }
+        .mode-icon { font-size: 30px; margin-bottom: 8px; }
+        .mode-label { font-size: 14px; font-weight: bold; }
+        .mode-desc { font-size: 11px; color: #888; margin-top: 5px; }
+
+        /* 방 코드 입력 */
+        .room-code-input {
+            font-size: 24px !important;
+            text-align: center;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+        }
+        .room-code-display {
+            font-size: 36px;
+            text-align: center;
+            letter-spacing: 10px;
+            color: #ffd700;
+            background: rgba(255,215,0,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        /* 대기실 */
+        .waiting-players {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .player-slot {
+            flex: 1;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            background: rgba(255,255,255,0.05);
+            border: 2px dashed rgba(255,255,255,0.2);
+        }
+        .player-slot.filled {
+            border-style: solid;
+            border-color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        .player-slot.me {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+        .player-avatar { font-size: 40px; margin-bottom: 10px; }
+        .player-name { font-size: 14px; font-weight: bold; }
+        .player-status { font-size: 12px; color: #888; margin-top: 5px; }
+        .player-status.ready { color: #4caf50; }
+
+        .waiting-dots {
+            display: inline-block;
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        /* 배틀 게임 화면 */
+        .game-screen {
+            padding: 0;
+            justify-content: flex-start;
+        }
+
+        .battle-header {
+            flex-shrink: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            padding: 8px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
+            gap: 10px;
+        
+    padding:4px !important;
+    height:80px !important;
+}
+
+        .player-score-box {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .player-score-box.left {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(102, 126, 234, 0.1));
+            border: 1px solid rgba(102, 126, 234, 0.5);
+        }
+        .player-score-box.right {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(240, 147, 251, 0.1));
+            border: 1px solid rgba(240, 147, 251, 0.5);
+        }
+        .player-score-box .name {
+            font-size: 11px;
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .player-score-box .score {
+            font-size: 22px;
+            font-weight: bold;
+        }
+        .player-score-box.left .score { color: #667eea; }
+        .player-score-box.right .score { color: #f093fb; }
+        .player-score-box .streak {
+            font-size: 10px;
+            color: #ffd700;
+        }
+
+        .vs-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .battle-status {
+            flex-shrink: 0;
+            width: 100%;
+            padding: 5px;
+            text-align: center;
+            font-size: 12px;
+            background: rgba(0,0,0,0.5);
+        }
+        .battle-status .question-num {
+            color: #ffd700;
+        }
+
+        .question-box {
+            flex-shrink: 0;
+            width: 100%;
+            padding: 12px;
+            text-align: center;
+            background: rgba(0,0,0,0.5);
+        }
+        .word-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .word-korean {
+            font-size: clamp(20px, 5vw, 28px);
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .game-canvas-container {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        
+    min-height: 55vh;
+}
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .mobile-controls {
+            flex-shrink: 0;
+            width: 100%;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(0,0,0,0.8);
+        }
+        .control-left { display: flex; gap: 15px; }
+        .ctrl-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .fire-btn {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            border-color: #ff6b6b;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-controls { display: flex; }
+        }
+
+        /* 배틀 결과 화면 */
+        .battle-result {
+            text-align: center;
+        }
+        .winner-announcement {
+            font-size: 50px;
+            margin-bottom: 10px;
+        }
+        .winner-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .winner-title.win { color: #ffd700; }
+        .winner-title.lose { color: #888; }
+        .winner-title.draw { color: #4caf50; }
+
+        .battle-scores {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .battle-score-card {
+            flex: 1;
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .battle-score-card.winner {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.05));
+            border: 2px solid #ffd700;
+        }
+        .battle-score-card.loser {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .score-card-name { font-size: 14px; color: #aaa; margin-bottom: 5px; }
+        .score-card-value { font-size: 32px; font-weight: bold; }
+        .score-card-detail { font-size: 12px; color: #888; margin-top: 5px; }
+
+        /* 로딩 */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .feedback-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 30px;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 500;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: pre-line;
+        }
+        .feedback-popup.show { opacity: 1; }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .level-btn {
+            padding: 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .level-btn:hover { background: rgba(255,255,255,0.1); }
+        .level-btn.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+        .level-score { font-size: 20px; font-weight: bold; }
+        .level-label { font-size: 11px; color: #888; }
+
+        .admin-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .admin-link a {
+            color: #666;
+            font-size: 12px;
+            text-decoration: none;
+        }
+
+        .hearts-display {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+        }
+        .heart { font-size: 16px; }
+        .heart.lost { opacity: 0.3; }
+
+        /* 복사 버튼 */
+        .copy-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .copy-btn:hover { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="feedback-popup" id="feedbackPopup"></div>
+
+    <!-- ===== 로그인 화면 ===== -->
+    <div class="screen active" id="loginScreen">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:15px;">
+                <div style="font-size:12px; color:#667eea; letter-spacing:1px;">우송대학교 AI경영학과</div>
+                <div style="font-size:14px; color:#f093fb; font-weight:bold; margin-top:3px;">🎓 게임기반 학습플랫폼</div>
+            </div>
+            <div class="logo">🚀</div>
+            <h1 class="title">토익 영단어 갤러그</h1>
+            <p class="subtitle">TOEIC Vocabulary Battle</p>
+
+            <div class="input-group">
+                <label>학번 (Student ID)</label>
+                <input type="text" id="studentId" placeholder="학번 입력 / Enter Student ID" maxlength="20">
+            </div>
+
+            <div class="input-group">
+                <label>이름 (Name)</label>
+                <input type="text" id="playerName" placeholder="이름 입력 / Enter Name" maxlength="10">
+            </div>
+
+            <!-- 게임 모드 선택 -->
+            <div style="margin: 20px 0;">
+                <label style="display:block; margin-bottom:10px; color:#aaa; font-size:13px;">게임 모드 선택 (Select Mode)</label>
+                <div class="mode-buttons">
+                    <div class="mode-btn selected" onclick="selectMode('solo')" id="modeSolo">
+                        <div class="mode-icon">👤</div>
+                        <div class="mode-label">1인 게임</div>
+                        <div class="mode-desc">Solo Mode</div>
+                    </div>
+                    <div class="mode-btn battle" onclick="selectMode('battle')" id="modeBattle">
+                        <div class="mode-icon">⚔️</div>
+                        <div class="mode-label">2인 배틀</div>
+                        <div class="mode-desc">Battle Mode</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="login()" id="loginBtn">🎮 시작하기 (Start)</button>
+            <button class="btn btn-secondary" onclick="showScreen('leaderboardScreen')">🏆 순위 보기 (Ranking)</button>
+
+            <div class="admin-link">
+                <a href="admin.html">🔧 관리자 모드 (Admin)</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 배틀 로비 화면 ===== -->
+    <div class="screen" id="battleLobbyScreen">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:10px; font-size:11px;">
+                <span style="color:#667eea;">🎓 우송대학교 AI경영학과</span>
+                <span style="color:#f093fb; margin-left:5px;">게임기반 학습플랫폼</span>
+            </div>
+            <h2 class="title">⚔️ 2인 배틀 모드</h2>
+            <p class="subtitle">친구와 함께 영단어 대결!</p>
+
+            <button class="btn btn-battle" onclick="createRoom()">🏠 방 만들기 (Create Room)</button>
+            
+            <div style="text-align:center; margin:15px 0; color:#666;">— 또는 —</div>
+
+            <div class="input-group">
+                <label>방 코드 입력 (Room Code)</label>
+                <input type="text" id="roomCodeInput" class="room-code-input" placeholder="ABCD" maxlength="4">
+            </div>
+            <button class="btn btn-success" onclick="joinRoom()">🚪 방 참가하기 (Join Room)</button>
+
+            <button class="btn btn-secondary" onclick="showScreen('loginScreen')" style="margin-top:20px;">← 돌아가기</button>
+        </div>
+    </div>
+
+    <!-- ===== 대기실 화면 ===== -->
+    <div class="screen" id="waitingRoomScreen">
+        <div class="card">
+            <h2 class="title">🎮 대기실</h2>
+            <p class="subtitle">상대방을 기다리는 중...</p>
+
+            <div class="room-code-display" id="displayRoomCode">ABCD</div>
+            <button class="copy-btn" onclick="copyRoomCode()">📋 코드 복사하기</button>
+
+            <div class="waiting-players">
+                <div class="player-slot me filled" id="player1Slot">
+                    <div class="player-avatar">👤</div>
+                    <div class="player-name" id="player1Name">나</div>
+                    <div class="player-status" id="player1Status">대기 중</div>
+                </div>
+                <div class="player-slot" id="player2Slot">
+                    <div class="player-avatar">❓</div>
+                    <div class="player-name" id="player2Name">상대방</div>
+                    <div class="player-status" id="player2Status">접속 대기 중...</div>
+                </div>
+            </div>
+
+            <!-- 레벨 선택 (방장만) -->
+            <div id="levelSelectArea" style="display:none;">
+                <label style="display:block; margin-bottom:10px; color:#aaa; font-size:13px;">레벨 선택 (방장)</label>
+                <div class="level-grid" id="battleLevelGrid">
+                    <div class="level-btn selected" onclick="selectBattleLevel(300)">
+                        <div class="level-score">300</div>
+                        <div class="level-label">기초</div>
+                    </div>
+                    <div class="level-btn" onclick="selectBattleLevel(400)">
+                        <div class="level-score">400</div>
+                        <div class="level-label">초급</div>
+                    </div>
+                    <div class="level-btn" onclick="selectBattleLevel(500)">
+                        <div class="level-score">500</div>
+                        <div class="level-label">중급</div>
+                    </div>
+                    <div class="level-btn" onclick="selectBattleLevel(600)">
+                        <div class="level-score">600</div>
+                        <div class="level-label">중고급</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-battle" onclick="startBattle()" id="startBattleBtn" disabled>
+                ⏳ 상대방 대기 중...
+            </button>
+            <button class="btn btn-secondary" onclick="leaveRoom()">🚪 나가기</button>
+        </div>
+    </div>
+
+    <!-- ===== 1인 레벨 선택 화면 ===== -->
+    <div class="screen" id="levelScreen">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:10px; font-size:11px;">
+                <span style="color:#667eea;">🎓 우송대학교 AI경영학과</span>
+                <span style="color:#f093fb; margin-left:5px;">게임기반 학습플랫폼</span>
+            </div>
+            <h2 class="title">📚 레벨 선택</h2>
+            <p class="subtitle">목표 토익 점수를 선택하세요</p>
+
+            <div class="level-grid">
+                <div class="level-btn" onclick="selectLevel(300)">
+                    <div class="level-score">300</div>
+                    <div class="level-label">기초</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(400)">
+                    <div class="level-score">400</div>
+                    <div class="level-label">초급</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(500)">
+                    <div class="level-score">500</div>
+                    <div class="level-label">중급</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(600)">
+                    <div class="level-score">600</div>
+                    <div class="level-label">중고급</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(700)">
+                    <div class="level-score">700</div>
+                    <div class="level-label">고급</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(800)">
+                    <div class="level-score">800</div>
+                    <div class="level-label">실전</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(900)">
+                    <div class="level-score">900</div>
+                    <div class="level-label">마스터</div>
+                </div>
+                <div class="level-btn" onclick="selectLevel(1000)">
+                    <div class="level-score">990+</div>
+                    <div class="level-label">챔피언</div>
+                </div>
+            </div>
+
+            <button class="btn btn-secondary" onclick="showScreen('loginScreen')">← 처음으로</button>
+        </div>
+    </div>
+
+    <!-- ===== 게임 화면 ===== -->
+    <div class="screen game-screen" id="gameScreen">
+        <!-- 배틀모드: 양쪽 점수 표시 -->
+        <div class="battle-header" id="battleHeader" style="display:none;">
+            <div class="player-score-box left">
+                <div class="name" id="battleLeftName">나</div>
+                <div class="score" id="battleLeftScore">0</div>
+                <div class="streak" id="battleLeftStreak"></div>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="player-score-box right">
+                <div class="name" id="battleRightName">상대</div>
+                <div class="score" id="battleRightScore">0</div>
+                <div class="streak" id="battleRightStreak"></div>
+            </div>
+        </div>
+
+        <!-- 솔로모드: 기존 헤더 -->
+        <div id="soloHeader" style="flex-shrink:0; width:100%; padding:8px; background:linear-gradient(180deg, rgba(0,0,0,0.8), transparent);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="text-align:center; flex:1;">
+                    <div style="font-size:11px; color:#888;">레벨 점수</div>
+                    <div style="font-size:20px; font-weight:bold; color:#667eea;" id="scoreDisplay">0</div>
+                </div>
+                <div style="text-align:center; flex:1;">
+                    <div style="font-size:11px; color:#888;">문제</div>
+                    <div style="font-size:16px; font-weight:bold;" id="questionDisplay">1/?</div>
+                </div>
+                <div style="text-align:center; flex:1;">
+                    <div style="font-size:11px; color:#888;">남은 기회</div>
+                    <div class="hearts-display" id="heartsDisplay">
+                        <span class="heart">❤️</span>
+                        <span class="heart">❤️</span>
+                        <span class="heart">❤️</span>
+                        <span class="heart">❤️</span>
+                        <span class="heart">❤️</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="battle-status" id="battleStatus" style="display:none;">
+            <span class="question-num" id="battleQuestionNum">문제 1/10</span>
+            <span id="battleTimeLeft"></span>
+        </div>
+
+        <div class="question-box">
+            <div class="word-label">이 뜻을 가진 영단어는?</div>
+            <div class="word-korean" id="koreanWord">-</div>
+        </div>
+
+        <div class="game-canvas-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <div class="mobile-controls">
+            <div class="control-left">
+                <button class="ctrl-btn" id="leftBtn">◀</button>
+                <button class="ctrl-btn" id="rightBtn">▶</button>
+            </div>
+            <button class="ctrl-btn fire-btn" id="fireBtn">💥 발사</button>
+        </div>
+    </div>
+
+    <!-- ===== 솔로 결과 화면 ===== -->
+    <div class="screen" id="resultScreen">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:10px; font-size:11px;">
+                <span style="color:#667eea;">🎓 우송대학교 AI경영학과</span>
+                <span style="color:#f093fb; margin-left:5px;">게임기반 학습플랫폼</span>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:50px;" id="resultIcon">🎉</div>
+                <h2 id="resultTitle" style="margin:10px 0;">미션 성공!</h2>
+            </div>
+            <div style="display:flex; justify-content:space-around; margin:20px 0;">
+                <div style="text-align:center;">
+                    <div style="font-size:24px; font-weight:bold; color:#667eea;" id="resultScore">0</div>
+                    <div style="font-size:12px; color:#888;">점수</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:24px; font-weight:bold; color:#4caf50;" id="resultCorrect">0</div>
+                    <div style="font-size:12px; color:#888;">정답</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:24px; font-weight:bold; color:#f44336;" id="resultWrong">0</div>
+                    <div style="font-size:12px; color:#888;">오답</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="restartLevel()">🔄 다시 도전</button>
+            <button class="btn btn-secondary" onclick="showScreen('levelScreen')">📚 레벨 선택</button>
+        </div>
+    </div>
+
+    <!-- ===== 배틀 결과 화면 ===== -->
+    <div class="screen" id="battleResultScreen">
+        <div class="card battle-result">
+            <div style="text-align:center; margin-bottom:10px; font-size:11px;">
+                <span style="color:#667eea;">🎓 우송대학교 AI경영학과</span>
+                <span style="color:#f093fb; margin-left:5px;">게임기반 학습플랫폼</span>
+            </div>
+            <div class="winner-announcement" id="battleResultIcon">🏆</div>
+            <div class="winner-title win" id="battleResultTitle">승리!</div>
+
+            <div class="battle-scores">
+                <div class="battle-score-card winner" id="leftScoreCard">
+                    <div class="score-card-name" id="leftCardName">나</div>
+                    <div class="score-card-value" id="leftCardScore">0</div>
+                    <div class="score-card-detail" id="leftCardDetail">정답 0 / 오답 0</div>
+                </div>
+                <div class="battle-score-card loser" id="rightScoreCard">
+                    <div class="score-card-name" id="rightCardName">상대</div>
+                    <div class="score-card-value" id="rightCardScore">0</div>
+                    <div class="score-card-detail" id="rightCardDetail">정답 0 / 오답 0</div>
+                </div>
+            </div>
+
+            <button class="btn btn-battle" onclick="rematch()">🔄 재대결 (Rematch)</button>
+            <button class="btn btn-secondary" onclick="exitBattle()">🚪 나가기</button>
+        </div>
+    </div>
+
+    <!-- ===== 순위표 화면 ===== -->
+    <div class="screen" id="leaderboardScreen">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:10px; font-size:11px;">
+                <span style="color:#667eea;">🎓 우송대학교 AI경영학과</span>
+                <span style="color:#f093fb; margin-left:5px;">게임기반 학습플랫폼</span>
+            </div>
+            <h2 class="title">🏆 명예의 전당</h2>
+            <p class="subtitle">최고 점수 기준</p>
+            <div id="leaderboardList" style="max-height:300px; overflow-y:auto;">
+                <!-- 동적 로드 -->
+            </div>
+            <button class="btn btn-secondary" onclick="showScreen('loginScreen')" style="margin-top:15px;">← 돌아가기</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // Firebase 설정
+        // ========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvU3l3c6qLOqtorOe_zlcs2oCj6PfF62o",
+  authDomain: "toeic-battle.firebaseapp.com",
+  databaseURL: "https://toeic-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "toeic-battle",
+  storageBucket: "toeic-battle.firebasestorage.app",
+  messagingSenderId: "949933180792",
+  appId: "1:949933180792:web:13772f58226882453d6a8d"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 고정 가상 캔버스 크기 (모바일/PC 공통)
+        const LOGICAL_WIDTH = 420;
+        const LOGICAL_HEIGHT = 720;
+
+        // ========================================
+        // 게임 상태
+        // ========================================
+        let gameMode = 'solo';  // 'solo' 또는 'battle'
+        let isHost = false;     // 방장 여부
+        let roomCode = '';      // 현재 방 코드
+        let roomRef = null;     // Firebase 방 레퍼런스
+        let roomListener = null; // 방 상태 리스너
+
+        let battleSyncTimer = null;  // 배틀 실시간 동기화 타이머
+
+        let player = {
+            studentId: '',
+            name: '',
+            currentLevel: 300,
+            totalScore: 0,
+            passedLevels: []
+        };
+
+        let opponent = {
+            studentId: '',
+            name: '',
+            score: 0,
+            correct: 0,
+            wrong: 0,
+            streak: 0,
+            shipX: null,
+            shipY: null,
+            bullets: [],
+            hitShakeTime: 0
+        };
+
+        let game = {
+            canvas: null,
+            ctx: null,
+            width: 0,
+            height: 0,
+            running: false,
+            words: [],
+            usedWordIndices: [],
+            currentWord: null,
+            questionNumber: 0,
+            totalQuestions: 0,
+            score: 0,
+            correctCount: 0,
+            wrongCount: 0,
+            maxWrong: 5,
+            wrongWords: [],
+            questionAnswered: false,
+            streak: 0,
+            ship: { x: 0, y: 0, width: 40, height: 40, speed: 8 },
+            bullets: [],
+            enemies: [],
+            particles: [],
+            confetti: [],
+            keys: {},
+            touchX: null,
+            lastTime: 0,
+            animFrame: null,
+            scaleFactor: 1,
+            deviceScale: 1,
+            screenShakeTime: 0,
+            hitByOpponent: false,
+            questionOrder: []  // 배틀모드용 문제 순서
+        };
+
+        // 기본 단어 (Firebase 연결 실패 시)
+        const defaultWords = {
+            300: [
+                { word: "apple", meaning: "사과" },
+                { word: "book", meaning: "책" },
+                { word: "car", meaning: "자동차" },
+                { word: "dog", meaning: "개" },
+                { word: "eat", meaning: "먹다" },
+                { word: "food", meaning: "음식" },
+                { word: "good", meaning: "좋은" },
+                { word: "happy", meaning: "행복한" },
+                { word: "ice", meaning: "얼음" },
+                { word: "job", meaning: "직업" }
+            ],
+            400: [
+                { word: "achieve", meaning: "달성하다" },
+                { word: "benefit", meaning: "이익" },
+                { word: "consider", meaning: "고려하다" },
+                { word: "develop", meaning: "개발하다" },
+                { word: "establish", meaning: "설립하다" }
+            ]
+        };
+
+        // ========================================
+        // 유틸리티 함수
+        // ========================================
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('active', show);
+        }
+
+        function showFeedback(message, color) {
+            const popup = document.getElementById('feedbackPopup');
+            popup.textContent = message;
+            popup.style.background = color;
+            popup.classList.add('show');
+            setTimeout(() => popup.classList.remove('show'), 2000);
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            if (screenId === 'leaderboardScreen') {
+                loadLeaderboard();
+            }
+        }
+
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 4; i++) {
+                code += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return code;
+        }
+
+        function playSound(freq, duration, type) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.frequency.value = freq;
+                oscillator.type = type;
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        
+        // ========================================
+        // 배틀 실시간 동기화 (내 우주선/총알 → Firebase)
+        // ========================================
+        function syncBattleState() {
+            if (gameMode !== 'battle' || !roomRef || !game.running) return;
+
+            const myPath = isHost ? 'host' : 'guest';
+
+            const payload = {
+                shipX: game.ship.x,
+                shipY: game.ship.y,
+                bullets: game.bullets.map(b => ({ x: b.x, y: b.y })), // 상대 표시용
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            roomRef.child('runtime').child(myPath).set(payload).catch(() => {
+                // 네트워크 에러는 조용히 무시
+            });
+        }
+
+// ========================================
+        // 모드 선택
+        // ========================================
+        function selectMode(mode) {
+            gameMode = mode;
+            document.getElementById('modeSolo').classList.toggle('selected', mode === 'solo');
+            document.getElementById('modeBattle').classList.toggle('selected', mode === 'battle');
+            
+            const btn = document.getElementById('loginBtn');
+            if (mode === 'solo') {
+                btn.textContent = '🎮 시작하기 (Start)';
+                btn.className = 'btn btn-primary';
+            } else {
+                btn.textContent = '⚔️ 배틀 시작 (Battle)';
+                btn.className = 'btn btn-battle';
+            }
+        }
+
+        // ========================================
+        // 로그인
+        // ========================================
+        function login() {
+            const studentId = document.getElementById('studentId').value.trim();
+            const name = document.getElementById('playerName').value.trim();
+            
+            if (!studentId || !name) {
+                showFeedback('학번과 이름을 입력하세요', '#f44336');
+                return;
+            }
+            
+            player.studentId = studentId;
+            player.name = name;
+            player.totalScore = 0;
+            player.passedLevels = [];
+            
+            if (gameMode === 'solo') {
+                showScreen('levelScreen');
+            } else {
+                showScreen('battleLobbyScreen');
+            }
+        }
+
+        // ========================================
+        // 배틀 모드 - 방 생성
+        // ========================================
+        async function createRoom() {
+            showLoading(true);
+            isHost = true;
+            roomCode = generateRoomCode();
+            
+            try {
+                roomRef = database.ref(`toeic_galaga/battle_rooms/${roomCode}`);
+                
+                await roomRef.set({
+                    status: 'waiting',
+                    level: 300,
+                    questionIndex: 0,
+                    questionOrder: [],
+                    host: {
+                        name: player.name,
+                        studentId: player.studentId,
+                        score: 0,
+                        correct: 0,
+                        wrong: 0,
+                        streak: 0,
+                        ready: true,
+                        answered: false
+                    },
+                    guest: null,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                showLoading(false);
+                showWaitingRoom();
+                listenToRoom();
+                
+            } catch (error) {
+                showLoading(false);
+                showFeedback('방 생성 실패', '#f44336');
+                console.error(error);
+            }
+        }
+
+        // ========================================
+        // 배틀 모드 - 방 참가
+        // ========================================
+        async function joinRoom() {
+            const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            
+            if (code.length !== 4) {
+                showFeedback('4자리 방 코드를 입력하세요', '#f44336');
+                return;
+            }
+            
+            showLoading(true);
+            isHost = false;
+            roomCode = code;
+            
+            try {
+                roomRef = database.ref(`toeic_galaga/battle_rooms/${roomCode}`);
+                const snapshot = await roomRef.once('value');
+                
+                if (!snapshot.exists()) {
+                    showLoading(false);
+                    showFeedback('존재하지 않는 방입니다', '#f44336');
+                    return;
+                }
+                
+                const roomData = snapshot.val();
+                if (roomData.guest) {
+                    showLoading(false);
+                    showFeedback('이미 가득 찬 방입니다', '#f44336');
+                    return;
+                }
+                
+                if (roomData.status !== 'waiting') {
+                    showLoading(false);
+                    showFeedback('이미 게임이 진행 중입니다', '#f44336');
+                    return;
+                }
+                
+                // 게스트로 참가
+                await roomRef.child('guest').set({
+                    name: player.name,
+                    studentId: player.studentId,
+                    score: 0,
+                    correct: 0,
+                    wrong: 0,
+                    streak: 0,
+                    ready: true,
+                    answered: false
+                });
+                
+                opponent.name = roomData.host.name;
+                opponent.studentId = roomData.host.studentId;
+                
+                showLoading(false);
+                showWaitingRoom();
+                listenToRoom();
+                
+            } catch (error) {
+                showLoading(false);
+                showFeedback('방 참가 실패', '#f44336');
+                console.error(error);
+            }
+        }
+
+        // ========================================
+        // 대기실 표시
+        // ========================================
+        function showWaitingRoom() {
+            document.getElementById('displayRoomCode').textContent = roomCode;
+            document.getElementById('player1Name').textContent = player.name + (isHost ? ' (방장)' : '');
+            document.getElementById('player1Slot').classList.add('filled', 'me');
+            
+            if (isHost) {
+                document.getElementById('levelSelectArea').style.display = 'block';
+            } else {
+                document.getElementById('levelSelectArea').style.display = 'none';
+            }
+            
+            showScreen('waitingRoomScreen');
+        }
+
+        // ========================================
+        // 방 상태 리스닝
+        // ========================================
+        function listenToRoom() {
+            if (roomListener) {
+                roomRef.off('value', roomListener);
+            }
+            
+            roomListener = roomRef.on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    showFeedback('방이 삭제되었습니다', '#f44336');
+                    showScreen('battleLobbyScreen');
+                    return;
+                }
+                
+                const data = snapshot.val();
+                
+                // 상대방 정보 업데이트
+                if (isHost && data.guest) {
+                    opponent.name = data.guest.name;
+                    opponent.studentId = data.guest.studentId;
+                    updateWaitingUI(data);
+                } else if (!isHost && data.host) {
+                    opponent.name = data.host.name;
+                    opponent.studentId = data.host.studentId;
+                    updateWaitingUI(data);
+                }
+                
+                // 배틀 레벨 표시 (게스트용)
+                if (!isHost && data.level) {
+                    player.currentLevel = data.level;
+                }
+                
+                // 상대방 실시간 위치/총알 동기화
+                if (data.runtime) {
+                    const oppRuntime = isHost ? data.runtime.guest : data.runtime.host;
+                    if (oppRuntime) {
+                        if (typeof oppRuntime.shipX === 'number') opponent.shipX = oppRuntime.shipX;
+                        if (typeof oppRuntime.shipY === 'number') opponent.shipY = oppRuntime.shipY;
+                        if (Array.isArray(oppRuntime.bullets)) {
+                            opponent.bullets = oppRuntime.bullets;
+                        }
+                    }
+                }
+
+                // 게임 시작 감지
+                if (data.status === 'playing' && !game.running) {
+                    game.questionOrder = data.questionOrder || [];
+                    startBattleGame();
+                }
+                
+                // 게임 중 상대방 점수 업데이트
+                if (data.status === 'playing' && game.running) {
+                    const opponentData = isHost ? data.guest : data.host;
+                    if (opponentData) {
+                        opponent.score = opponentData.score || 0;
+                        opponent.correct = opponentData.correct || 0;
+                        opponent.wrong = opponentData.wrong || 0;
+                        opponent.streak = opponentData.streak || 0;
+                        updateBattleScores();
+                    }
+                }
+                
+                // 게임 종료 감지
+                if (data.status === 'finished') {
+                    showBattleResult(data);
+                }
+            });
+        }
+
+        function updateWaitingUI(data) {
+            const hasGuest = !!data.guest;
+            
+            document.getElementById('player2Slot').classList.toggle('filled', hasGuest);
+            document.getElementById('player2Name').textContent = hasGuest ? opponent.name : '상대방';
+            document.getElementById('player2Status').textContent = hasGuest ? '준비 완료!' : '접속 대기 중...';
+            document.getElementById('player2Status').classList.toggle('ready', hasGuest);
+            document.getElementById('player2Slot').querySelector('.player-avatar').textContent = hasGuest ? '👤' : '❓';
+            
+            const startBtn = document.getElementById('startBattleBtn');
+            if (isHost && hasGuest) {
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 게임 시작!';
+            } else if (isHost) {
+                startBtn.disabled = true;
+                startBtn.textContent = '⏳ 상대방 대기 중...';
+            } else {
+                startBtn.disabled = true;
+                startBtn.textContent = '⏳ 방장이 시작합니다...';
+            }
+        }
+
+        // ========================================
+        // 배틀 레벨 선택
+        // ========================================
+        function selectBattleLevel(level) {
+            player.currentLevel = level;
+            
+            document.querySelectorAll('#battleLevelGrid .level-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            event.target.closest('.level-btn').classList.add('selected');
+            
+            // Firebase에 레벨 업데이트
+            if (isHost && roomRef) {
+                roomRef.child('level').set(level);
+            }
+        }
+
+        // ========================================
+        // 배틀 시작 (방장만)
+        // ========================================
+        async function startBattle() {
+            if (!isHost) return;
+            
+            showLoading(true);
+            
+            try {
+                // 단어 로드
+                const snapshot = await database.ref(`toeic_galaga/words/level${player.currentLevel}`).once('value');
+                
+                if (snapshot.exists()) {
+                    game.words = [];
+                    snapshot.forEach(child => {
+                        game.words.push(child.val());
+                    });
+                } else {
+                    game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
+                }
+                
+                // 문제 순서 셔플 (10문제)
+                const numQuestions = Math.min(10, game.words.length);
+                const indices = [];
+                for (let i = 0; i < game.words.length; i++) indices.push(i);
+                const shuffled = shuffleArray([...indices]).slice(0, numQuestions);
+                
+                // Firebase에 게임 상태 업데이트
+                await roomRef.update({
+                    status: 'playing',
+                    questionIndex: 0,
+                    questionOrder: shuffled,
+                    level: player.currentLevel
+                });
+                
+                showLoading(false);
+                
+            } catch (error) {
+                showLoading(false);
+                showFeedback('게임 시작 실패', '#f44336');
+                console.error(error);
+            }
+        }
+
+        // ========================================
+        // 배틀 게임 시작
+        // ========================================
+        async function startBattleGame() {
+            showLoading(true);
+            
+            try {
+                // 단어 로드
+                const snapshot = await database.ref(`toeic_galaga/words/level${player.currentLevel}`).once('value');
+                
+                if (snapshot.exists()) {
+                    game.words = [];
+                    snapshot.forEach(child => {
+                        game.words.push(child.val());
+                    });
+                } else {
+                    game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
+                }
+                
+                showLoading(false);
+                
+                // UI 설정
+                document.getElementById('battleHeader').style.display = 'flex';
+                document.getElementById('soloHeader').style.display = 'none';
+                document.getElementById('battleStatus').style.display = 'block';
+                
+                document.getElementById('battleLeftName').textContent = player.name;
+                document.getElementById('battleRightName').textContent = opponent.name;
+                
+                showScreen('gameScreen');
+                
+                setTimeout(() => {
+                    initBattleGame();
+                    requestAnimationFrame(gameLoop);
+                }, 100);
+
+                // 배틀 동기화 타이머 시작 (초당 약 8회 전송)
+                if (battleSyncTimer) clearInterval(battleSyncTimer);
+                battleSyncTimer = setInterval(syncBattleState, 120);
+                
+            } catch (error) {
+                showLoading(false);
+                showFeedback('게임 로드 실패', '#f44336');
+            }
+        }
+
+        function initBattleGame() {
+            game.canvas = document.getElementById('gameCanvas');
+            game.ctx = game.canvas.getContext('2d');
+            
+            resizeCanvas();
+            
+            game.running = true;
+            game.score = 0;
+            game.correctCount = 0;
+            game.wrongCount = 0;
+            game.questionNumber = 0;
+            game.totalQuestions = game.questionOrder.length;
+            game.usedWordIndices = [];
+            game.wrongWords = [];
+            game.bullets = [];
+            game.enemies = [];
+            game.particles = [];
+            game.confetti = [];
+            game.streak = 0;
+            game.questionAnswered = false;
+            
+            game.ship.x = game.width / 2 - game.ship.width / 2;
+            game.ship.y = game.height - game.ship.height - 20;
+            
+            updateBattleScores();
+            nextBattleQuestion();
+            setupControls();
+        }
+
+        function nextBattleQuestion() {
+            if (game.questionNumber >= game.totalQuestions) {
+                endBattle();
+                return;
+            }
+            
+            const wordIndex = game.questionOrder[game.questionNumber];
+            game.currentWord = game.words[wordIndex];
+            game.questionNumber++;
+            game.questionAnswered = false;
+            game.enemies = [];
+            game.bullets = [];
+            
+            document.getElementById('koreanWord').textContent = game.currentWord.meaning;
+            document.getElementById('battleQuestionNum').textContent = `문제 ${game.questionNumber}/${game.totalQuestions}`;
+            
+            // 내 답변 상태 리셋
+            const myPath = isHost ? 'host' : 'guest';
+            roomRef.child(myPath).update({ answered: false });
+            
+            spawnEnemies();
+        }
+
+        function updateBattleScores() {
+            document.getElementById('battleLeftScore').textContent = game.score;
+            document.getElementById('battleRightScore').textContent = opponent.score;
+            
+            if (game.streak >= 3) {
+                document.getElementById('battleLeftStreak').textContent = `🔥 ${game.streak}연속!`;
+            } else {
+                document.getElementById('battleLeftStreak').textContent = '';
+            }
+            
+            if (opponent.streak >= 3) {
+                document.getElementById('battleRightStreak').textContent = `🔥 ${opponent.streak}연속!`;
+            } else {
+                document.getElementById('battleRightStreak').textContent = '';
+            }
+        }
+
+        // ========================================
+        // 배틀 종료
+        // ========================================
+        async function endBattle() {
+            game.running = false;
+            if (game.animFrame) cancelAnimationFrame(game.animFrame);
+
+            if (battleSyncTimer) {
+                clearInterval(battleSyncTimer);
+                battleSyncTimer = null;
+            }
+
+            // 최종 점수 저장
+            const myPath = isHost ? 'host' : 'guest';
+            await roomRef.child(myPath).update({
+                score: game.score,
+                correct: game.correctCount,
+                wrong: game.wrongCount,
+                streak: game.streak
+            });
+            
+            // 방장만 게임 종료 처리
+            if (isHost) {
+                setTimeout(async () => {
+                    await roomRef.child('status').set('finished');
+                }, 500);
+            }
+        }
+
+        function showBattleResult(data) {
+            game.running = false;
+            if (game.animFrame) cancelAnimationFrame(game.animFrame);
+            
+            const myData = isHost ? data.host : data.guest;
+            const oppData = isHost ? data.guest : data.host;
+            
+            const myScore = myData?.score || 0;
+            const oppScore = oppData?.score || 0;
+            
+            let resultIcon, resultTitle, titleClass;
+            
+            if (myScore > oppScore) {
+                resultIcon = '🏆';
+                resultTitle = '승리! (Victory!)';
+                titleClass = 'win';
+                playSound(523, 0.3, 'sine');
+                setTimeout(() => playSound(659, 0.3, 'sine'), 100);
+                setTimeout(() => playSound(784, 0.3, 'sine'), 200);
+            } else if (myScore < oppScore) {
+                resultIcon = '😢';
+                resultTitle = '패배... (Defeat)';
+                titleClass = 'lose';
+                playSound(200, 0.3, 'sawtooth');
+            } else {
+                resultIcon = '🤝';
+                resultTitle = '무승부! (Draw!)';
+                titleClass = 'draw';
+                playSound(440, 0.3, 'sine');
+            }
+            
+            document.getElementById('battleResultIcon').textContent = resultIcon;
+            document.getElementById('battleResultTitle').textContent = resultTitle;
+            document.getElementById('battleResultTitle').className = 'winner-title ' + titleClass;
+            
+            // 내 점수 카드
+            document.getElementById('leftCardName').textContent = player.name;
+            document.getElementById('leftCardScore').textContent = myScore;
+            document.getElementById('leftCardDetail').textContent = `정답 ${myData?.correct || 0} / 오답 ${myData?.wrong || 0}`;
+            document.getElementById('leftScoreCard').className = 'battle-score-card ' + (myScore >= oppScore ? 'winner' : 'loser');
+            
+            // 상대 점수 카드
+            document.getElementById('rightCardName').textContent = opponent.name;
+            document.getElementById('rightCardScore').textContent = oppScore;
+            document.getElementById('rightCardDetail').textContent = `정답 ${oppData?.correct || 0} / 오답 ${oppData?.wrong || 0}`;
+            document.getElementById('rightScoreCard').className = 'battle-score-card ' + (oppScore >= myScore ? 'winner' : 'loser');
+            
+            showScreen('battleResultScreen');
+        }
+
+        // ========================================
+        // 재대결 / 나가기
+        // ========================================
+        async function rematch() {
+            if (isHost) {
+                // 방 초기화
+                await roomRef.update({
+                    status: 'waiting',
+                    questionIndex: 0,
+                    questionOrder: [],
+                    'host/score': 0,
+                    'host/correct': 0,
+                    'host/wrong': 0,
+                    'host/streak': 0,
+                    'host/answered': false,
+                    'guest/score': 0,
+                    'guest/correct': 0,
+                    'guest/wrong': 0,
+                    'guest/streak': 0,
+                    'guest/answered': false
+                });
+            }
+            showWaitingRoom();
+        }
+
+        function exitBattle() {
+            leaveRoom();
+            showScreen('loginScreen');
+        }
+
+        function leaveRoom() {
+            if (battleSyncTimer) {
+                clearInterval(battleSyncTimer);
+                battleSyncTimer = null;
+            }
+
+            if (roomListener && roomRef) {
+                roomRef.off('value', roomListener);
+            }
+            
+            if (isHost && roomRef) {
+                roomRef.remove();
+            } else if (roomRef) {
+                roomRef.child('guest').remove();
+            }
+            
+            roomRef = null;
+            roomCode = '';
+            isHost = false;
+        }
+
+        function copyRoomCode() {
+            navigator.clipboard.writeText(roomCode).then(() => {
+                showFeedback('📋 코드가 복사되었습니다!', '#4caf50');
+            }).catch(() => {
+                showFeedback('코드: ' + roomCode, '#4caf50');
+            });
+        }
+
+        // ========================================
+        // 솔로 모드 - 레벨 선택
+        // ========================================
+        function selectLevel(level) {
+            player.currentLevel = level;
+            startSoloGame();
+        }
+
+        async function startSoloGame() {
+            showLoading(true);
+            
+            try {
+                const snapshot = await database.ref(`toeic_galaga/words/level${player.currentLevel}`).once('value');
+                
+                if (snapshot.exists()) {
+                    game.words = [];
+                    snapshot.forEach(child => {
+                        game.words.push(child.val());
+                    });
+                } else {
+                    game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
+                }
+                
+                if (game.words.length < 4) {
+                    showFeedback('단어가 부족합니다', '#f44336');
+                    showLoading(false);
+                    return;
+                }
+                
+                // UI 설정
+                document.getElementById('battleHeader').style.display = 'none';
+                document.getElementById('soloHeader').style.display = 'block';
+                document.getElementById('battleStatus').style.display = 'none';
+                
+                showLoading(false);
+                showScreen('gameScreen');
+                
+                setTimeout(() => {
+                    initSoloGame();
+                    requestAnimationFrame(gameLoop);
+                }, 100);
+                
+            } catch (error) {
+                console.error('Error loading words:', error);
+                game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
+                showLoading(false);
+                showScreen('gameScreen');
+                setTimeout(() => {
+                    initSoloGame();
+                    requestAnimationFrame(gameLoop);
+                }, 100);
+            }
+        }
+
+        function initSoloGame() {
+            game.canvas = document.getElementById('gameCanvas');
+            game.ctx = game.canvas.getContext('2d');
+            
+            resizeCanvas();
+            
+            game.running = true;
+            game.score = 0;
+            game.correctCount = 0;
+            game.wrongCount = 0;
+            game.questionNumber = 0;
+            game.totalQuestions = game.words.length;
+            game.usedWordIndices = [];
+            game.wrongWords = [];
+            game.bullets = [];
+            game.enemies = [];
+            game.particles = [];
+            game.confetti = [];
+            game.streak = 0;
+            game.questionAnswered = false;
+            
+            game.ship.x = game.width / 2 - game.ship.width / 2;
+            game.ship.y = game.height - game.ship.height - 20;
+            
+            updateHeartsDisplay();
+            nextSoloQuestion();
+            setupControls();
+        }
+
+        function nextSoloQuestion() {
+            if (game.usedWordIndices.length >= game.words.length) {
+                missionSuccess();
+                return;
+            }
+            
+            let availableIndices = [];
+            for (let i = 0; i < game.words.length; i++) {
+                if (!game.usedWordIndices.includes(i)) {
+                    availableIndices.push(i);
+                }
+            }
+            
+            const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            game.usedWordIndices.push(randomIndex);
+            game.currentWord = game.words[randomIndex];
+            game.questionNumber++;
+            game.questionAnswered = false;
+            game.enemies = [];
+            game.bullets = [];
+            
+            document.getElementById('koreanWord').textContent = game.currentWord.meaning;
+            document.getElementById('questionDisplay').textContent = `${game.questionNumber}/${game.totalQuestions}`;
+            document.getElementById('scoreDisplay').textContent = game.score;
+            
+            spawnEnemies();
+        }
+
+        function resizeCanvas() {
+            if (!game.canvas) return;
+
+            const canvas = game.canvas;
+            const container = canvas.parentElement || document.body;
+            const rect = container.getBoundingClientRect();
+
+            let deviceWidth = rect.width;
+            let deviceHeight = rect.height;
+
+            if (!deviceWidth || !deviceHeight) {
+                deviceWidth = window.innerWidth;
+                deviceHeight = window.innerHeight - 200;
+            }
+
+            // 내부 논리 좌표계는 고정 (420 x 720)
+            canvas.width = LOGICAL_WIDTH;
+            canvas.height = LOGICAL_HEIGHT;
+            game.width = LOGICAL_WIDTH;
+            game.height = LOGICAL_HEIGHT;
+
+            // 디바이스 크기에 맞춰 CSS 스케일만 조정
+            const scale = Math.min(
+                deviceWidth / LOGICAL_WIDTH,
+                deviceHeight / LOGICAL_HEIGHT
+            );
+            const displayWidth = LOGICAL_WIDTH * scale;
+            const displayHeight = LOGICAL_HEIGHT * scale;
+
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+
+            game.deviceScale = scale;
+        }
+
+        function update(dt) }
+
+        function updateHeartsDisplay() {
+            const container = document.getElementById('heartsDisplay');
+            let html = '';
+            for (let i = 0; i < game.maxWrong; i++) {
+                if (i < game.maxWrong - game.wrongCount) {
+                    html += '<span class="heart">❤️</span>';
+                } else {
+                    html += '<span class="heart lost">🖤</span>';
+                }
+            }
+            container.innerHTML = html;
+        }
+
+        // ========================================
+        // 적 생성 (공통)
+        // ========================================
+        function spawnEnemies() {
+            const correctWord = game.currentWord.word;
+            
+            const otherWords = game.words
+                .filter(w => w.word !== correctWord)
+                .map(w => w.word);
+            const wrongWords = shuffleArray([...otherWords]).slice(0, 3);
+            
+            const allOptions = shuffleArray([
+                { text: correctWord, isCorrect: true },
+                ...wrongWords.map(w => ({ text: w, isCorrect: false }))
+            ]);
+            
+            const padding = 10;
+            const gap = 8;
+            const availableWidth = game.width - (padding * 2);
+            const isMobile = (window.innerWidth < 600);
+            
+            let blockWidth, blockHeight, cols;
+            
+            if (isMobile) {
+                cols = 2;
+                blockWidth = Math.min(120, (availableWidth - gap) / 2);
+                blockHeight = 50;
+            } else {
+                cols = 4;
+                blockWidth = Math.min(130, (availableWidth - gap * 3) / 4);
+                blockHeight = 55;
+            }
+            
+            const totalGridWidth = (blockWidth * cols) + (gap * (cols - 1));
+            const startX = (game.width - totalGridWidth) / 2;
+            
+            allOptions.forEach((option, i) => {
+                let col, row;
+                if (isMobile) {
+                    col = i % 2;
+                    row = Math.floor(i / 2);
+                } else {
+                    col = i;
+                    row = 0;
+                }
+                
+                game.enemies.push({
+                    x: startX + col * (blockWidth + gap),
+                    y: -60 - row * (blockHeight + gap + 10) - (isMobile ? 0 : i * 20),
+                    width: blockWidth,
+                    height: blockHeight,
+                    speed: 0.7 + Math.random() * 0.3,
+                    text: option.text,
+                    isCorrect: option.isCorrect,
+                    type: 'main',
+                    color: '#3949ab',
+                    glowColor: '#7986cb',
+                    destroyed: false,
+                    wobbleOffset: Math.random() * Math.PI * 2,
+                    baseX: startX + col * (blockWidth + gap),
+                    maxWobble: Math.min(15, (game.width - totalGridWidth) / 4)
+                });
+            });
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // ========================================
+        // 발사
+        // ========================================
+        function shoot() {
+            if (!game.running || game.bullets.length >= 3) return;
+            
+            game.bullets.push({
+                x: game.ship.x + game.ship.width / 2,
+                y: game.ship.y - 10,
+                radius: 12,
+                speed: 10,
+                glow: 1
+            });
+            
+            playSound(150, 0.3, 'triangle');
+            setTimeout(() => playSound(100, 0.2, 'triangle'), 50);
+        }
+
+        // ========================================
+        // 게임 루프
+        // ========================================
+        function gameLoop(timestamp) {
+            if (!game.running) return;
+            
+            if (game.width === 0 || game.height === 0) {
+                resizeCanvas();
+                game.ship.x = game.width / 2 - game.ship.width / 2;
+                game.ship.y = game.height - game.ship.height - 20;
+            }
+            
+            const dt = timestamp - game.lastTime;
+            game.lastTime = timestamp;
+            
+            update(dt);
+            render();
+            
+            game.animFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // 우주선 이동
+            if (game.keys['ArrowLeft'] || game.keys['KeyA']) {
+                game.ship.x -= game.ship.speed;
+            }
+            if (game.keys['ArrowRight'] || game.keys['KeyD']) {
+                game.ship.x += game.ship.speed;
+            }
+            
+            if (game.touchX !== null) {
+                const targetX = game.touchX - game.ship.width / 2;
+                game.ship.x += (targetX - game.ship.x) * 0.15;
+            }
+            
+            game.ship.x = Math.max(0, Math.min(game.width - game.ship.width, game.ship.x));
+            
+            // 대포알 이동
+            game.bullets = game.bullets.filter(b => {
+                b.y -= b.speed;
+                return b.y > -b.radius;
+            });
+            
+            // 적 이동 및 충돌
+            let mainEnemyCount = 0;
+            let allMainEnemiesGone = true;
+            
+            game.enemies.forEach(enemy => {
+                if (enemy.destroyed) return;
+                
+                if (enemy.type === 'main') {
+                    mainEnemyCount++;
+                    if (enemy.y < game.height) {
+                        allMainEnemiesGone = false;
+                    }
+                }
+                
+                enemy.y += enemy.speed;
+                
+                const wobble = Math.sin(Date.now() / 500 + enemy.wobbleOffset) * (enemy.maxWobble || 10);
+                const newX = (enemy.baseX || enemy.x) + wobble;
+                
+                if (newX >= 5 && newX + enemy.width <= game.width - 5) {
+                    enemy.x = newX;
+                }
+                
+                // 충돌
+                game.bullets.forEach((bullet, bi) => {
+                    if (checkCollision(bullet, enemy)) {
+                        game.bullets.splice(bi, 1);
+                        enemy.destroyed = true;
+                        
+                        if (enemy.isCorrect) {
+                            handleCorrectAnswer(enemy);
+                        } else if (enemy.type === 'main') {
+                            handleWrongAnswer(enemy);
+                        }
+                    }
+                });
+            });
+            
+            // 시간 초과
+            if (mainEnemyCount > 0 && allMainEnemiesGone && !game.questionAnswered) {
+                handleTimeout();
+            }
+            
+            // 파티클
+            game.particles = game.particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.15;
+                p.life--;
+                return p.life > 0;
+            });
+            
+            game.confetti = game.confetti.filter(c => {
+                c.x += c.vx;
+                c.y += c.vy;
+                c.vy += 0.1;
+                c.rotation += c.rotationSpeed;
+                c.life--;
+                return c.life > 0;
+            });
+            
+            game.enemies = game.enemies.filter(e => !e.destroyed && e.y < game.height + 100);
+        }
+
+        // 배틀 모드: 상대 총알과 내 우주선 충돌 판정
+        function bulletHitsShip(bullet, ship) {
+            if (!bullet || !ship) return false;
+
+            const radius = bullet.radius || 10;
+            const circleX = bullet.x;
+            const circleY = bullet.y;
+
+            const closestX = Math.max(ship.x, Math.min(circleX, ship.x + ship.width));
+            const closestY = Math.max(ship.y, Math.min(circleY, ship.y + ship.height));
+
+            const dx = circleX - closestX;
+            const dy = circleY - closestY;
+            return (dx * dx + dy * dy) < radius * radius;
+        }
+
+        function handleShipHitByOpponent() {
+            if (game.hitByOpponent || !game.running) return;
+
+            game.hitByOpponent = true;
+            game.screenShakeTime = 300;
+            game.streak = 0;
+
+            showFeedback('💥 상대의 공격을 맞았습니다!', '#e91e63');
+            playSound(180, 0.25, 'sawtooth');
+
+            setTimeout(() => {
+                game.hitByOpponent = false;
+            }, 400);
+        }
+
+        function handleCorrectAnswer(enemy) {
+            createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#00ff88');
+            game.score += 100;
+            game.correctCount++;
+            game.streak++;
+            game.questionAnswered = true;
+            playSound(523, 0.3, 'sine');
+            
+            // 배틀모드: Firebase 업데이트
+            if (gameMode === 'battle' && roomRef) {
+                const myPath = isHost ? 'host' : 'guest';
+                roomRef.child(myPath).update({
+                    score: game.score,
+                    correct: game.correctCount,
+                    streak: game.streak,
+                    answered: true
+                });
+            }
+            
+            // 5연속 보너스
+            if (game.streak > 0 && game.streak % 5 === 0) {
+                createConfetti();
+                const bonusMultiplier = Math.floor((player.currentLevel - 300) / 100) + 1;
+                const bonusScore = bonusMultiplier * 1000;
+                game.score += bonusScore;
+                showFeedback(`🎊🎈 ${game.streak}연속 정답! 🎈🎊\n🎁 +${bonusScore.toLocaleString()}점 보너스!`, '#ff6b9d');
+                playSound(784, 0.3, 'sine');
+                setTimeout(() => playSound(988, 0.3, 'sine'), 100);
+                setTimeout(() => playSound(1175, 0.3, 'sine'), 200);
+                
+                if (gameMode === 'battle' && roomRef) {
+                    const myPath = isHost ? 'host' : 'guest';
+                    roomRef.child(myPath + '/score').set(game.score);
+                }
+            } else {
+                const praises = ['🎉 정답!', '⭐ 완벽!', '🔥 굿!', '💯 최고!', '🚀 멋져!', '👏 브라보!', '🏆 챔피언!', '✨ 정답!'];
+                const praise = praises[Math.floor(Math.random() * praises.length)];
+                showFeedback(praise + ' +100점', '#4caf50');
+            }
+            
+            if (gameMode === 'battle') {
+                updateBattleScores();
+                setTimeout(() => nextBattleQuestion(), 1000);
+            } else {
+                document.getElementById('scoreDisplay').textContent = game.score;
+                setTimeout(() => nextSoloQuestion(), 1000);
+            }
+        }
+
+        function handleWrongAnswer(enemy) {
+            createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ff4444');
+            game.wrongCount++;
+            game.streak = 0;
+            game.wrongWords.push(game.currentWord);
+            game.questionAnswered = true;
+            playSound(200, 0.2, 'sawtooth');
+            
+            if (gameMode === 'battle' && roomRef) {
+                const myPath = isHost ? 'host' : 'guest';
+                roomRef.child(myPath).update({
+                    wrong: game.wrongCount,
+                    streak: 0,
+                    answered: true
+                });
+                updateBattleScores();
+                showFeedback(`❌ 오답!\n정답: ${game.currentWord.word}`, '#f44336');
+                setTimeout(() => nextBattleQuestion(), 1500);
+            } else {
+                updateHeartsDisplay();
+                if (game.wrongCount >= game.maxWrong) {
+                    showFeedback('💔 기회를 모두 잃었어요!', '#f44336');
+                    setTimeout(() => gameOver(), 1500);
+                } else {
+                    showFeedback(`❌ 오답!\n정답: ${game.currentWord.word}\n남은 기회: ${game.maxWrong - game.wrongCount}`, '#f44336');
+                    setTimeout(() => nextSoloQuestion(), 1500);
+                }
+            }
+        }
+
+        function handleTimeout() {
+            game.questionAnswered = true;
+            game.wrongCount++;
+            game.streak = 0;
+            game.wrongWords.push(game.currentWord);
+            
+            if (gameMode === 'battle' && roomRef) {
+                const myPath = isHost ? 'host' : 'guest';
+                roomRef.child(myPath).update({
+                    wrong: game.wrongCount,
+                    streak: 0,
+                    answered: true
+                });
+                updateBattleScores();
+                showFeedback(`⏰ 시간 초과!\n정답: ${game.currentWord.word}`, '#ff9800');
+                playSound(150, 0.3, 'sawtooth');
+                setTimeout(() => nextBattleQuestion(), 1500);
+            } else {
+                updateHeartsDisplay();
+                if (game.wrongCount >= game.maxWrong) {
+                    showFeedback('💔 기회를 모두 잃었어요!', '#f44336');
+                    setTimeout(() => gameOver(), 1500);
+                } else {
+                    showFeedback(`⏰ 시간 초과!\n정답: ${game.currentWord.word}\n남은 기회: ${game.maxWrong - game.wrongCount}`, '#ff9800');
+                    playSound(150, 0.3, 'sawtooth');
+                    setTimeout(() => nextSoloQuestion(), 1500);
+                }
+            }
+        }
+
+        function checkCollision(bullet, enemy) {
+            const circleX = bullet.x;
+            const circleY = bullet.y;
+            const radius = bullet.radius || 12;
+            
+            const closestX = Math.max(enemy.x, Math.min(circleX, enemy.x + enemy.width));
+            const closestY = Math.max(enemy.y, Math.min(circleY, enemy.y + enemy.height));
+            
+            const distanceX = circleX - closestX;
+            const distanceY = circleY - closestY;
+            const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+            
+            return distance < radius;
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                game.particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    color: color,
+                    life: 30 + Math.random() * 20
+                });
+            }
+        }
+
+        function createConfetti() {
+            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43'];
+            const launchPoints = [
+                { x: game.width * 0.2, y: game.height },
+                { x: game.width * 0.5, y: game.height },
+                { x: game.width * 0.8, y: game.height }
+            ];
+            
+            launchPoints.forEach(point => {
+                for (let i = 0; i < 30; i++) {
+                    game.confetti.push({
+                        x: point.x + (Math.random() - 0.5) * 50,
+                        y: point.y,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: -8 - Math.random() * 10,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: 5 + Math.random() * 8,
+                        shape: Math.random() > 0.5 ? 'rect' : 'circle',
+                        rotation: Math.random() * 360,
+                        rotationSpeed: (Math.random() - 0.5) * 15,
+                        life: 80 + Math.random() * 40
+                    });
+                }
+            });
+        }
+
+        // ========================================
+        // 렌더링
+        // ========================================
+        function render() {
+            const ctx = game.ctx;
+            
+            ctx.fillStyle = '#0a0a15';
+            ctx.fillRect(0, 0, game.width, game.height);
+            
+            drawStars();
+            
+            // 적 (단어 블록)
+            game.enemies.forEach(enemy => {
+                if (enemy.destroyed) return;
+                
+                ctx.save();
+                ctx.shadowColor = enemy.glowColor;
+                ctx.shadowBlur = 15;
+                
+                const gradient = ctx.createLinearGradient(enemy.x, enemy.y, enemy.x, enemy.y + enemy.height);
+                gradient.addColorStop(0, '#5c6bc0');
+                gradient.addColorStop(1, '#3949ab');
+                ctx.fillStyle = gradient;
+                
+                ctx.beginPath();
+                ctx.roundRect(enemy.x, enemy.y, enemy.width, enemy.height, 8);
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'white';
+                const fontSize = Math.max(14, Math.floor(18 * game.scaleFactor));
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(enemy.text, enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                ctx.restore();
+            });
+            
+            // 대포알
+            game.bullets.forEach(bullet => {
+                ctx.save();
+                ctx.shadowColor = '#ff6600';
+                ctx.shadowBlur = 20;
+                
+                const gradient = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, bullet.radius);
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.3, '#ffcc00');
+                gradient.addColorStop(0.6, '#ff6600');
+                gradient.addColorStop(1, '#cc3300');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.beginPath();
+                ctx.arc(bullet.x - 3, bullet.y - 3, bullet.radius * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+            
+            // 상대방 총알 (배틀 모드)
+            if (gameMode === 'battle' && opponent.bullets && opponent.bullets.length) {
+                opponent.bullets.forEach(b => {
+                    if (!b) return;
+                    ctx.save();
+                    ctx.shadowColor = '#ff80bf';
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = '#ff80bf';
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+
+            // 우주선
+            drawShip();
+
+            // 상대 우주선
+            if (gameMode === 'battle' && opponent.shipX != null) {
+                drawOpponentShip();
+            }
+            
+            // 파티클
+            game.particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life / 50;
+                ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
+            });
+            ctx.globalAlpha = 1;
+            
+            // 풍선폭죽
+            game.confetti.forEach(c => {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, c.life / 30);
+                ctx.fillStyle = c.color;
+                ctx.translate(c.x, c.y);
+                ctx.rotate(c.rotation * Math.PI / 180);
+                
+                if (c.shape === 'rect') {
+                    ctx.fillRect(-c.size/2, -c.size/4, c.size, c.size/2);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, c.size/2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function drawStars() {
+            const ctx = game.ctx;
+            const time = Date.now() / 1000;
+            
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 137.5) % game.width;
+                const y = ((i * 73.3 + time * 20) % game.height);
+                const brightness = 0.3 + Math.sin(time * 2 + i) * 0.2;
+                ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+                ctx.fillRect(x, y, 2, 2);
+            }
+        }
+
+        function drawShip() {
+            const ctx = game.ctx;
+            const x = game.ship.x;
+            const y = game.ship.y;
+            const w = game.ship.width;
+            const h = game.ship.height;
+            
+            ctx.save();
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 15;
+            
+            ctx.fillStyle = '#4fc3f7';
+            ctx.beginPath();
+            ctx.moveTo(x + w/2, y);
+            ctx.lineTo(x + w, y + h);
+            ctx.lineTo(x + w/2, y + h * 0.7);
+            ctx.lineTo(x, y + h);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = '#81d4fa';
+            ctx.beginPath();
+            ctx.moveTo(x + w/2, y + 5);
+            ctx.lineTo(x + w - 8, y + h - 5);
+            ctx.lineTo(x + w/2, y + h * 0.65);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // 엔진 불꽃
+            ctx.fillStyle = `hsl(${30 + Math.random() * 30}, 100%, 60%)`;
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.3, y + h);
+            ctx.lineTo(x + w/2, y + h + 10 + Math.random() * 8);
+            ctx.lineTo(x + w * 0.7, y + h);
+            ctx.fill();
+        }
+
+
+
+        // 상대 우주선 렌더링
+        function drawOpponentShip() {
+            const ctx = game.ctx;
+            if (!ctx) return;
+            if (opponent.shipX == null) return;
+
+            const w = game.ship.width;
+            const h = game.ship.height;
+
+            const x = opponent.shipX;
+            const y = 50; // 상단 고정 위치
+
+            ctx.save();
+            ctx.shadowColor = '#ff80bf';
+            ctx.shadowBlur = 15;
+
+            ctx.fillStyle = '#ff4f8b';
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y);
+            ctx.lineTo(x + w, y + h);
+            ctx.lineTo(x + w / 2, y + h * 0.7);
+            ctx.lineTo(x, y + h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ff9ecd';
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y + 5);
+            ctx.lineTo(x + w - 8, y + h - 5);
+            ctx.lineTo(x + w / 2, y + h * 0.65);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+        // ========================================
+        // 결과 화면 (솔로)
+        // ========================================
+        function missionSuccess() {
+            game.running = false;
+            if (game.animFrame) cancelAnimationFrame(game.animFrame);
+            
+            player.totalScore += game.score;
+            player.passedLevels.push(player.currentLevel);
+            
+            saveScore();
+            
+            document.getElementById('resultIcon').textContent = '🎉';
+            document.getElementById('resultTitle').textContent = '🏆 미션 성공!';
+            document.getElementById('resultScore').textContent = game.score;
+            document.getElementById('resultCorrect').textContent = game.correctCount;
+            document.getElementById('resultWrong').textContent = game.wrongCount;
+            
+            showScreen('resultScreen');
+            playSound(523, 0.3, 'sine');
+            setTimeout(() => playSound(659, 0.3, 'sine'), 100);
+            setTimeout(() => playSound(784, 0.3, 'sine'), 200);
+        }
+
+        function gameOver() {
+            game.running = false;
+            if (game.animFrame) cancelAnimationFrame(game.animFrame);
+            
+            document.getElementById('resultIcon').textContent = '💔';
+            document.getElementById('resultTitle').textContent = '게임 오버';
+            document.getElementById('resultScore').textContent = game.score;
+            document.getElementById('resultCorrect').textContent = game.correctCount;
+            document.getElementById('resultWrong').textContent = game.wrongCount;
+            
+            showScreen('resultScreen');
+        }
+
+        function restartLevel() {
+            if (gameMode === 'battle') {
+                showWaitingRoom();
+            } else {
+                startSoloGame();
+            }
+        }
+
+        // ========================================
+        // 점수 저장/로드
+        // ========================================
+        function saveScore() {
+            const scoreData = {
+                studentId: player.studentId,
+                playerName: player.name,
+                totalScore: player.totalScore,
+                levelScore: game.score,
+                level: player.currentLevel,
+                passedLevels: player.passedLevels,
+                correct: game.correctCount,
+                wrong: game.wrongCount,
+                total: game.totalQuestions,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                date: new Date().toLocaleString('ko-KR')
+            };
+            
+            database.ref('toeic_galaga/scores').push(scoreData);
+        }
+
+        async function loadLeaderboard() {
+            const list = document.getElementById('leaderboardList');
+            list.innerHTML = '<div style="text-align:center; padding:20px;">로딩 중...</div>';
+            
+            try {
+                const snapshot = await database.ref('toeic_galaga/scores')
+                    .orderByChild('totalScore')
+                    .limitToLast(50)
+                    .once('value');
+                
+                const scores = [];
+                snapshot.forEach(child => {
+                    scores.push(child.val());
+                });
+                
+                scores.sort((a, b) => b.totalScore - a.totalScore);
+                
+                // 중복 제거
+                const uniqueScores = [];
+                const seenIds = new Set();
+                scores.forEach(score => {
+                    if (!seenIds.has(score.studentId)) {
+                        seenIds.add(score.studentId);
+                        uniqueScores.push(score);
+                    }
+                });
+                
+                if (uniqueScores.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">아직 기록이 없습니다</div>';
+                    return;
+                }
+                
+                let html = '';
+                uniqueScores.slice(0, 10).forEach((score, index) => {
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+                    html += `
+                        <div style="display:flex; align-items:center; padding:10px; border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <div style="width:35px; font-size:18px; text-align:center;">${medal}</div>
+                            <div style="flex:1;">
+                                <div style="font-weight:bold;">${score.playerName}</div>
+                                <div style="font-size:11px; color:#888;">${score.studentId}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:bold; color:#ffd700;">${score.totalScore?.toLocaleString() || 0}</div>
+                                <div style="font-size:11px; color:#888;">Lv.${score.level || 300}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                list.innerHTML = html;
+                
+            } catch (error) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#f44336;">로드 실패</div>';
+            }
+        }
+
+        // ========================================
+        // 컨트롤
+        // ========================================
+        function setupControls() {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            
+            const canvas = game.canvas;
+            canvas.removeEventListener('touchstart', handleTouchStart);
+            canvas.removeEventListener('touchmove', handleTouchMove);
+            canvas.removeEventListener('touchend', handleTouchEnd);
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd);
+            
+            document.getElementById('leftBtn').ontouchstart = (e) => { e.preventDefault(); game.keys['ArrowLeft'] = true; };
+            document.getElementById('leftBtn').ontouchend = () => game.keys['ArrowLeft'] = false;
+            document.getElementById('rightBtn').ontouchstart = (e) => { e.preventDefault(); game.keys['ArrowRight'] = true; };
+            document.getElementById('rightBtn').ontouchend = () => game.keys['ArrowRight'] = false;
+            document.getElementById('fireBtn').ontouchstart = (e) => { e.preventDefault(); shoot(); };
+        }
+
+        function handleKeyDown(e) {
+            game.keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                shoot();
+            }
+        }
+
+        function handleKeyUp(e) {
+            game.keys[e.code] = false;
+        }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = game.canvas.getBoundingClientRect();
+            const scaleX = game.canvas.width / rect.width;
+            game.touchX = (touch.clientX - rect.left) * scaleX;
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = game.canvas.getBoundingClientRect();
+            const scaleX = game.canvas.width / rect.width;
+            game.touchX = (touch.clientX - rect.left) * scaleX;
+        }
+
+        function handleTouchEnd(e) {
+            game.touchX = null;
+            shoot();
+        }
+
+        // 창 크기 변경
+        window.addEventListener('resize', () => {
+            if (game.canvas) resizeCanvas();
+        });
+
+        // 페이지 종료 시 방 정리
+        window.addEventListener('beforeunload', () => {
+            leaveRoom();
+        });
+    </script>
+</body>
+</html>
