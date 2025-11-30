@@ -817,6 +817,10 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        // 고정 가상 캔버스 크기 (모바일/PC 공통)
+        const LOGICAL_WIDTH = 420;
+        const LOGICAL_HEIGHT = 720;
+
         // ========================================
         // 게임 상태
         // ========================================
@@ -877,6 +881,7 @@
             lastTime: 0,
             animFrame: null,
             scaleFactor: 1,
+            deviceScale: 1,
             screenShakeTime: 0,
             hitByOpponent: false,
             questionOrder: []  // 배틀모드용 문제 순서
@@ -1657,21 +1662,41 @@
         }
 
         function resizeCanvas() {
-            const container = game.canvas.parentElement;
-            let width = container.clientWidth;
-            let height = container.clientHeight;
-            
-            if (width === 0 || height === 0) {
-                width = window.innerWidth;
-                height = window.innerHeight - 200;
+            if (!game.canvas) return;
+
+            const canvas = game.canvas;
+            const container = canvas.parentElement || document.body;
+            const rect = container.getBoundingClientRect();
+
+            let deviceWidth = rect.width;
+            let deviceHeight = rect.height;
+
+            if (!deviceWidth || !deviceHeight) {
+                deviceWidth = window.innerWidth;
+                deviceHeight = window.innerHeight - 200;
             }
-            
-            game.canvas.width = width;
-            game.canvas.height = height;
-            game.width = width;
-            game.height = height;
-            game.scaleFactor = Math.min(1, game.width / 400);
+
+            // 내부 논리 좌표계는 고정 (420 x 720)
+            canvas.width = LOGICAL_WIDTH;
+            canvas.height = LOGICAL_HEIGHT;
+            game.width = LOGICAL_WIDTH;
+            game.height = LOGICAL_HEIGHT;
+
+            // 디바이스 크기에 맞춰 CSS 스케일만 조정
+            const scale = Math.min(
+                deviceWidth / LOGICAL_WIDTH,
+                deviceHeight / LOGICAL_HEIGHT
+            );
+            const displayWidth = LOGICAL_WIDTH * scale;
+            const displayHeight = LOGICAL_HEIGHT * scale;
+
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+
+            game.deviceScale = scale;
         }
+
+        function update(dt) }
 
         function updateHeartsDisplay() {
             const container = document.getElementById('heartsDisplay');
@@ -2448,14 +2473,16 @@
             e.preventDefault();
             const touch = e.touches[0];
             const rect = game.canvas.getBoundingClientRect();
-            game.touchX = touch.clientX - rect.left;
+            const scaleX = game.canvas.width / rect.width;
+            game.touchX = (touch.clientX - rect.left) * scaleX;
         }
 
         function handleTouchMove(e) {
             e.preventDefault();
             const touch = e.touches[0];
             const rect = game.canvas.getBoundingClientRect();
-            game.touchX = touch.clientX - rect.left;
+            const scaleX = game.canvas.width / rect.width;
+            game.touchX = (touch.clientX - rect.left) * scaleX;
         }
 
         function handleTouchEnd(e) {
