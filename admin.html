@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 토익 갤러그 - 단어 관리자</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #667eea, #f093fb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .status-item.connected {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .status-item.disconnected {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 13px;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            font-size: 14px;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            min-height: 200px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            line-height: 1.5;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #e91e63);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .word-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+
+        .word-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s;
+        }
+
+        .word-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .word-item:last-child {
+            border-bottom: none;
+        }
+
+        .word-info {
+            flex: 1;
+        }
+
+        .word-english {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .word-korean {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 2px;
+        }
+
+        .word-actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat-box {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .stat-box:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .stat-box.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            line-height: 1.5;
+        }
+
+        .format-example {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+            color: #4caf50;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            transform: translateX(150%);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #f44336, #e91e63);
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            border-radius: 8px 8px 0 0;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: rgba(102, 126, 234, 0.2);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .bulk-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state .icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+
+        .level-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .level-300 { background: #4caf50; }
+        .level-400 { background: #8bc34a; }
+        .level-500 { background: #ffc107; color: #333; }
+        .level-600 { background: #ff9800; }
+        .level-700 { background: #ff5722; }
+        .level-800 { background: #e91e63; }
+        .level-900 { background: #9c27b0; }
+        .level-1000 { background: #673ab7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header">
+            <h1>🔧 토익 갤러그 단어 관리자</h1>
+            <p>레벨별 토익 단어를 추가, 수정, 삭제할 수 있습니다</p>
+            <div class="status-bar">
+                <div class="status-item" id="connectionStatus">⏳ 연결 중...</div>
+                <div class="status-item" id="totalWords">📚 전체 단어: 0개</div>
+            </div>
+        </div>
+
+        <!-- 레벨별 통계 -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>📊 레벨별 단어 현황</h2>
+            <div class="stats-grid" id="levelStats">
+                <div class="stat-box selected" data-level="300" onclick="selectLevel(300)">
+                    <div class="stat-number" id="count300">0</div>
+                    <div class="stat-label">Level 300 (기초)</div>
+                </div>
+                <div class="stat-box" data-level="400" onclick="selectLevel(400)">
+                    <div class="stat-number" id="count400">0</div>
+                    <div class="stat-label">Level 400 (초급)</div>
+                </div>
+                <div class="stat-box" data-level="500" onclick="selectLevel(500)">
+                    <div class="stat-number" id="count500">0</div>
+                    <div class="stat-label">Level 500 (중급)</div>
+                </div>
+                <div class="stat-box" data-level="600" onclick="selectLevel(600)">
+                    <div class="stat-number" id="count600">0</div>
+                    <div class="stat-label">Level 600 (중고급)</div>
+                </div>
+                <div class="stat-box" data-level="700" onclick="selectLevel(700)">
+                    <div class="stat-number" id="count700">0</div>
+                    <div class="stat-label">Level 700 (고급)</div>
+                </div>
+                <div class="stat-box" data-level="800" onclick="selectLevel(800)">
+                    <div class="stat-number" id="count800">0</div>
+                    <div class="stat-label">Level 800 (실전)</div>
+                </div>
+                <div class="stat-box" data-level="900" onclick="selectLevel(900)">
+                    <div class="stat-number" id="count900">0</div>
+                    <div class="stat-label">Level 900 (마스터)</div>
+                </div>
+                <div class="stat-box" data-level="1000" onclick="selectLevel(1000)">
+                    <div class="stat-number" id="count1000">0</div>
+                    <div class="stat-label">Level 990+ (챔피언)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 메인 그리드 -->
+        <div class="main-grid">
+            <!-- 왼쪽: 단어 추가 -->
+            <div class="card">
+                <h2>➕ 단어 추가/업로드</h2>
+                
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('single')">개별 추가</button>
+                    <button class="tab" onclick="switchTab('bulk')">일괄 업로드</button>
+                    <button class="tab" onclick="switchTab('csv')">CSV 업로드</button>
+                </div>
+
+                <!-- 개별 추가 탭 -->
+                <div class="tab-content active" id="singleTab">
+                    <div class="form-group">
+                        <label>레벨 선택</label>
+                        <select id="singleLevel">
+                            <option value="300">Level 300 (기초)</option>
+                            <option value="400">Level 400 (초급)</option>
+                            <option value="500">Level 500 (중급)</option>
+                            <option value="600">Level 600 (중고급)</option>
+                            <option value="700">Level 700 (고급)</option>
+                            <option value="800">Level 800 (실전)</option>
+                            <option value="900">Level 900 (마스터)</option>
+                            <option value="1000">Level 990+ (챔피언)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>영어 단어</label>
+                        <input type="text" id="singleWord" placeholder="예: accomplish">
+                    </div>
+                    <div class="form-group">
+                        <label>한국어 뜻</label>
+                        <input type="text" id="singleMeaning" placeholder="예: 달성하다, 이루다">
+                    </div>
+                    <button class="btn btn-success" onclick="addSingleWord()">➕ 단어 추가</button>
+                </div>
+
+                <!-- 일괄 업로드 탭 -->
+                <div class="tab-content" id="bulkTab">
+                    <div class="form-group">
+                        <label>레벨 선택</label>
+                        <select id="bulkLevel">
+                            <option value="300">Level 300 (기초)</option>
+                            <option value="400">Level 400 (초급)</option>
+                            <option value="500">Level 500 (중급)</option>
+                            <option value="600">Level 600 (중고급)</option>
+                            <option value="700">Level 700 (고급)</option>
+                            <option value="800">Level 800 (실전)</option>
+                            <option value="900">Level 900 (마스터)</option>
+                            <option value="1000">Level 990+ (챔피언)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>단어 목록 (한 줄에 하나씩)</label>
+                        <textarea id="bulkWords" placeholder="형식: 영어단어, 한국어뜻&#10;&#10;예시:&#10;apple, 사과&#10;book, 책&#10;achieve, 달성하다"></textarea>
+                        <p class="help-text">💡 각 줄에 <strong>영어단어, 한국어뜻</strong> 형식으로 입력하세요.</p>
+                        <div class="format-example">
+                            apple, 사과<br>
+                            book, 책<br>
+                            achieve, 달성하다
+                        </div>
+                    </div>
+                    <button class="btn btn-success" onclick="uploadBulkWords()">📤 일괄 업로드</button>
+                    <button class="btn btn-secondary" onclick="clearBulkInput()">🗑️ 입력 지우기</button>
+                </div>
+
+                <!-- CSV 업로드 탭 -->
+                <div class="tab-content" id="csvTab">
+                    <div class="form-group">
+                        <label>레벨 선택</label>
+                        <select id="csvLevel">
+                            <option value="300">Level 300 (기초)</option>
+                            <option value="400">Level 400 (초급)</option>
+                            <option value="500">Level 500 (중급)</option>
+                            <option value="600">Level 600 (중고급)</option>
+                            <option value="700">Level 700 (고급)</option>
+                            <option value="800">Level 800 (실전)</option>
+                            <option value="900">Level 900 (마스터)</option>
+                            <option value="1000">Level 990+ (챔피언)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>CSV 파일 선택</label>
+                        <input type="file" id="csvFile" accept=".csv,.txt" style="padding: 10px;">
+                        <p class="help-text">💡 CSV 파일은 <strong>word,meaning</strong> 또는 <strong>영어,한국어</strong> 열이 있어야 합니다.</p>
+                    </div>
+                    <button class="btn btn-success" onclick="uploadCSV()">📄 CSV 업로드</button>
+                    <button class="btn btn-secondary" onclick="downloadTemplate()">📥 템플릿 다운로드</button>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 단어 목록 -->
+            <div class="card">
+                <h2>📋 단어 목록 <span class="level-badge" id="currentLevelBadge">Level 300</span></h2>
+                
+                <div class="loading" id="listLoading">
+                    <div class="spinner"></div>
+                    <div>단어를 불러오는 중...</div>
+                </div>
+
+                <div class="word-list" id="wordList">
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <div>단어가 없습니다</div>
+                    </div>
+                </div>
+
+                <div class="bulk-actions">
+                    <button class="btn btn-danger" onclick="deleteAllWords()">🗑️ 현재 레벨 전체 삭제</button>
+                    <button class="btn btn-secondary" onclick="exportWords()">📥 내보내기 (CSV)</button>
+                    <button class="btn btn-secondary" onclick="refreshWords()">🔄 새로고침</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 메시지 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Firebase 설정 (게임과 동일)
+        const firebaseConfig = {
+            apiKey: "AIzaSyALSxNGN8HPmfnxvjPJ0I7vXGaBWNjbc7Y",
+            authDomain: "woosong-45628.firebaseapp.com",
+            databaseURL: "https://woosong-45628-default-rtdb.firebaseio.com",
+            projectId: "woosong-45628",
+            storageBucket: "woosong-45628.firebasestorage.app",
+            messagingSenderId: "407498436498",
+            appId: "1:407498436498:web:ab0deacc7c81e498a55f5a",
+            measurementId: "G-2BT5RP9E14"
+        };
+
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 상태 변수
+        let currentLevel = 300;
+        let wordCounts = {};
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            checkConnection();
+            loadAllCounts();
+            loadWords(currentLevel);
+        });
+
+        // Firebase 연결 확인
+        function checkConnection() {
+            const connectedRef = database.ref('.info/connected');
+            connectedRef.on('value', (snap) => {
+                const status = document.getElementById('connectionStatus');
+                if (snap.val() === true) {
+                    status.textContent = '✅ Firebase 연결됨';
+                    status.classList.remove('disconnected');
+                    status.classList.add('connected');
+                } else {
+                    status.textContent = '❌ 연결 끊김';
+                    status.classList.remove('connected');
+                    status.classList.add('disconnected');
+                }
+            });
+        }
+
+        // 모든 레벨 단어 수 로드
+        async function loadAllCounts() {
+            const levels = [300, 400, 500, 600, 700, 800, 900, 1000];
+            let total = 0;
+
+            for (const level of levels) {
+                try {
+                    const snapshot = await database.ref(`toeic_galaga/words/level${level}`).once('value');
+                    const count = snapshot.exists() ? snapshot.numChildren() : 0;
+                    wordCounts[level] = count;
+                    document.getElementById(`count${level}`).textContent = count;
+                    total += count;
+                } catch (e) {
+                    document.getElementById(`count${level}`).textContent = '?';
+                }
+            }
+
+            document.getElementById('totalWords').textContent = `📚 전체 단어: ${total}개`;
+        }
+
+        // 레벨 선택
+        function selectLevel(level) {
+            currentLevel = level;
+            
+            // UI 업데이트
+            document.querySelectorAll('.stat-box').forEach(box => {
+                box.classList.remove('selected');
+                if (parseInt(box.dataset.level) === level) {
+                    box.classList.add('selected');
+                }
+            });
+
+            // 배지 업데이트
+            const badge = document.getElementById('currentLevelBadge');
+            badge.textContent = `Level ${level === 1000 ? '990+' : level}`;
+            badge.className = `level-badge level-${level}`;
+
+            // 셀렉트 박스들 동기화
+            document.getElementById('singleLevel').value = level;
+            document.getElementById('bulkLevel').value = level;
+            document.getElementById('csvLevel').value = level;
+
+            // 단어 로드
+            loadWords(level);
+        }
+
+        // 단어 목록 로드
+        async function loadWords(level) {
+            const listDiv = document.getElementById('wordList');
+            const loading = document.getElementById('listLoading');
+            
+            loading.classList.add('active');
+            listDiv.innerHTML = '';
+
+            try {
+                const snapshot = await database.ref(`toeic_galaga/words/level${level}`).once('value');
+                
+                loading.classList.remove('active');
+
+                if (!snapshot.exists() || snapshot.numChildren() === 0) {
+                    listDiv.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📭</div>
+                            <div>이 레벨에 등록된 단어가 없습니다</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                snapshot.forEach(child => {
+                    const word = child.val();
+                    const key = child.key;
+                    html += `
+                        <div class="word-item" id="word-${key}">
+                            <div class="word-info">
+                                <div class="word-english">${escapeHtml(word.word)}</div>
+                                <div class="word-korean">${escapeHtml(word.meaning)}</div>
+                            </div>
+                            <div class="word-actions">
+                                <button class="btn btn-secondary" onclick="editWord('${key}', '${escapeHtml(word.word)}', '${escapeHtml(word.meaning)}')">✏️</button>
+                                <button class="btn btn-danger" onclick="deleteWord('${key}')">🗑️</button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                listDiv.innerHTML = html;
+
+            } catch (error) {
+                loading.classList.remove('active');
+                listDiv.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <div>단어를 불러오는데 실패했습니다</div>
+                    </div>
+                `;
+                showToast('단어 로드 실패: ' + error.message, 'error');
+            }
+        }
+
+        // 탭 전환
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        // 개별 단어 추가
+        async function addSingleWord() {
+            const level = document.getElementById('singleLevel').value;
+            const word = document.getElementById('singleWord').value.trim();
+            const meaning = document.getElementById('singleMeaning').value.trim();
+
+            if (!word || !meaning) {
+                showToast('영어 단어와 한국어 뜻을 모두 입력하세요', 'error');
+                return;
+            }
+
+            try {
+                await database.ref(`toeic_galaga/words/level${level}`).push({
+                    word: word,
+                    meaning: meaning
+                });
+
+                showToast(`✅ "${word}" 단어가 추가되었습니다`, 'success');
+                
+                document.getElementById('singleWord').value = '';
+                document.getElementById('singleMeaning').value = '';
+
+                // 현재 레벨이면 새로고침
+                if (parseInt(level) === currentLevel) {
+                    loadWords(currentLevel);
+                }
+                loadAllCounts();
+
+            } catch (error) {
+                showToast('단어 추가 실패: ' + error.message, 'error');
+            }
+        }
+
+        // 일괄 업로드
+        async function uploadBulkWords() {
+            const level = document.getElementById('bulkLevel').value;
+            const text = document.getElementById('bulkWords').value.trim();
+
+            if (!text) {
+                showToast('단어 목록을 입력하세요', 'error');
+                return;
+            }
+
+            const lines = text.split('\n').filter(line => line.trim());
+            const words = [];
+
+            for (const line of lines) {
+                // 쉼표, 탭, 또는 여러 공백으로 구분
+                const parts = line.split(/[,\t]+/).map(p => p.trim());
+                
+                if (parts.length >= 2 && parts[0] && parts[1]) {
+                    words.push({
+                        word: parts[0],
+                        meaning: parts.slice(1).join(', ')  // 뜻이 여러 개인 경우
+                    });
+                }
+            }
+
+            if (words.length === 0) {
+                showToast('올바른 형식의 단어가 없습니다', 'error');
+                return;
+            }
+
+            try {
+                const ref = database.ref(`toeic_galaga/words/level${level}`);
+                
+                for (const word of words) {
+                    await ref.push(word);
+                }
+
+                showToast(`✅ ${words.length}개 단어가 업로드되었습니다`, 'success');
+                
+                document.getElementById('bulkWords').value = '';
+
+                if (parseInt(level) === currentLevel) {
+                    loadWords(currentLevel);
+                }
+                loadAllCounts();
+
+            } catch (error) {
+                showToast('업로드 실패: ' + error.message, 'error');
+            }
+        }
+
+        // CSV 업로드
+        async function uploadCSV() {
+            const level = document.getElementById('csvLevel').value;
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showToast('CSV 파일을 선택하세요', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const lines = text.split('\n').filter(line => line.trim());
+                const words = [];
+
+                // 첫 번째 줄이 헤더인지 확인
+                const firstLine = lines[0].toLowerCase();
+                const startIndex = (firstLine.includes('word') || firstLine.includes('영어') || firstLine.includes('단어')) ? 1 : 0;
+
+                for (let i = startIndex; i < lines.length; i++) {
+                    const parts = lines[i].split(/[,\t]+/).map(p => p.trim().replace(/^["']|["']$/g, ''));
+                    
+                    if (parts.length >= 2 && parts[0] && parts[1]) {
+                        words.push({
+                            word: parts[0],
+                            meaning: parts.slice(1).join(', ')
+                        });
+                    }
+                }
+
+                if (words.length === 0) {
+                    showToast('CSV에서 단어를 찾을 수 없습니다', 'error');
+                    return;
+                }
+
+                try {
+                    const ref = database.ref(`toeic_galaga/words/level${level}`);
+                    
+                    for (const word of words) {
+                        await ref.push(word);
+                    }
+
+                    showToast(`✅ ${words.length}개 단어가 업로드되었습니다`, 'success');
+                    
+                    fileInput.value = '';
+
+                    if (parseInt(level) === currentLevel) {
+                        loadWords(currentLevel);
+                    }
+                    loadAllCounts();
+
+                } catch (error) {
+                    showToast('업로드 실패: ' + error.message, 'error');
+                }
+            };
+
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        // 단어 수정
+        function editWord(key, word, meaning) {
+            const newWord = prompt('영어 단어:', word);
+            if (newWord === null) return;
+            
+            const newMeaning = prompt('한국어 뜻:', meaning);
+            if (newMeaning === null) return;
+
+            if (!newWord.trim() || !newMeaning.trim()) {
+                showToast('단어와 뜻을 모두 입력하세요', 'error');
+                return;
+            }
+
+            database.ref(`toeic_galaga/words/level${currentLevel}/${key}`).update({
+                word: newWord.trim(),
+                meaning: newMeaning.trim()
+            }).then(() => {
+                showToast('✅ 단어가 수정되었습니다', 'success');
+                loadWords(currentLevel);
+            }).catch(error => {
+                showToast('수정 실패: ' + error.message, 'error');
+            });
+        }
+
+        // 단어 삭제
+        function deleteWord(key) {
+            if (!confirm('이 단어를 삭제하시겠습니까?')) return;
+
+            database.ref(`toeic_galaga/words/level${currentLevel}/${key}`).remove()
+                .then(() => {
+                    showToast('✅ 단어가 삭제되었습니다', 'success');
+                    document.getElementById(`word-${key}`).remove();
+                    loadAllCounts();
+                })
+                .catch(error => {
+                    showToast('삭제 실패: ' + error.message, 'error');
+                });
+        }
+
+        // 현재 레벨 전체 삭제
+        function deleteAllWords() {
+            const levelName = currentLevel === 1000 ? '990+' : currentLevel;
+            if (!confirm(`⚠️ Level ${levelName}의 모든 단어를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다!`)) return;
+            if (!confirm(`정말로 삭제하시겠습니까? 마지막 확인입니다.`)) return;
+
+            database.ref(`toeic_galaga/words/level${currentLevel}`).remove()
+                .then(() => {
+                    showToast(`✅ Level ${levelName}의 모든 단어가 삭제되었습니다`, 'success');
+                    loadWords(currentLevel);
+                    loadAllCounts();
+                })
+                .catch(error => {
+                    showToast('삭제 실패: ' + error.message, 'error');
+                });
+        }
+
+        // 단어 내보내기
+        async function exportWords() {
+            try {
+                const snapshot = await database.ref(`toeic_galaga/words/level${currentLevel}`).once('value');
+                
+                if (!snapshot.exists()) {
+                    showToast('내보낼 단어가 없습니다', 'error');
+                    return;
+                }
+
+                let csv = 'word,meaning\n';
+                snapshot.forEach(child => {
+                    const word = child.val();
+                    csv += `"${word.word}","${word.meaning}"\n`;
+                });
+
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `toeic_level${currentLevel}_words.csv`;
+                link.click();
+
+                showToast('✅ CSV 파일이 다운로드됩니다', 'success');
+
+            } catch (error) {
+                showToast('내보내기 실패: ' + error.message, 'error');
+            }
+        }
+
+        // CSV 템플릿 다운로드
+        function downloadTemplate() {
+            const csv = 'word,meaning\napple,사과\nbook,책\nachieve,달성하다';
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'toeic_words_template.csv';
+            link.click();
+            showToast('📥 템플릿이 다운로드됩니다', 'info');
+        }
+
+        // 입력 지우기
+        function clearBulkInput() {
+            document.getElementById('bulkWords').value = '';
+        }
+
+        // 새로고침
+        function refreshWords() {
+            loadWords(currentLevel);
+            loadAllCounts();
+            showToast('🔄 새로고침 완료', 'info');
+        }
+
+        // 토스트 메시지
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // HTML 이스케이프
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 엔터 키로 단어 추가
+        document.getElementById('singleMeaning')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addSingleWord();
+        });
+        document.getElementById('singleWord')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('singleMeaning').focus();
+        });
+    </script>
+</body>
+</html>
