@@ -221,6 +221,7 @@
         .game-screen {
             padding: 0;
             justify-content: flex-start;
+            align-items: center !important;
         }
 
         .battle-header {
@@ -314,13 +315,14 @@
             position: relative;
             overflow: hidden;
             min-height: 55vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
         }
         #gameCanvas {
-            display: block;
-            margin: 0 auto;
+            display: block !important;
+            margin: 0 auto !important;
+            max-width: 100%;
         }
 
         .mobile-controls {
@@ -906,14 +908,131 @@
                 { word: "good", meaning: "좋은" },
                 { word: "happy", meaning: "행복한" },
                 { word: "ice", meaning: "얼음" },
-                { word: "job", meaning: "직업" }
+                { word: "job", meaning: "직업" },
+                { word: "water", meaning: "물" },
+                { word: "house", meaning: "집" },
+                { word: "school", meaning: "학교" },
+                { word: "friend", meaning: "친구" },
+                { word: "love", meaning: "사랑" }
             ],
             400: [
                 { word: "achieve", meaning: "달성하다" },
                 { word: "benefit", meaning: "이익" },
                 { word: "consider", meaning: "고려하다" },
                 { word: "develop", meaning: "개발하다" },
-                { word: "establish", meaning: "설립하다" }
+                { word: "establish", meaning: "설립하다" },
+                { word: "facility", meaning: "시설" },
+                { word: "generate", meaning: "생성하다" },
+                { word: "identify", meaning: "확인하다" },
+                { word: "maintain", meaning: "유지하다" },
+                { word: "obtain", meaning: "얻다" },
+                { word: "provide", meaning: "제공하다" },
+                { word: "require", meaning: "요구하다" },
+                { word: "suggest", meaning: "제안하다" },
+                { word: "available", meaning: "이용 가능한" },
+                { word: "include", meaning: "포함하다" }
+            ],
+            500: [
+                { word: "accommodate", meaning: "수용하다" },
+                { word: "acknowledge", meaning: "인정하다" },
+                { word: "adequate", meaning: "적절한" },
+                { word: "anticipate", meaning: "예상하다" },
+                { word: "apparent", meaning: "명백한" },
+                { word: "approximate", meaning: "대략적인" },
+                { word: "associate", meaning: "연관시키다" },
+                { word: "comprehensive", meaning: "포괄적인" },
+                { word: "contribute", meaning: "기여하다" },
+                { word: "coordinate", meaning: "조정하다" },
+                { word: "demonstrate", meaning: "보여주다" },
+                { word: "distinguish", meaning: "구별하다" },
+                { word: "efficient", meaning: "효율적인" },
+                { word: "implement", meaning: "실행하다" },
+                { word: "indicate", meaning: "나타내다" }
+            ],
+            600: [
+                { word: "acquisition", meaning: "획득, 인수" },
+                { word: "allocate", meaning: "할당하다" },
+                { word: "amendment", meaning: "수정, 개정" },
+                { word: "authorize", meaning: "승인하다" },
+                { word: "comply", meaning: "준수하다" },
+                { word: "confidential", meaning: "기밀의" },
+                { word: "consecutive", meaning: "연속적인" },
+                { word: "consolidate", meaning: "통합하다" },
+                { word: "constraint", meaning: "제약" },
+                { word: "contingency", meaning: "비상사태" },
+                { word: "deteriorate", meaning: "악화되다" },
+                { word: "diligent", meaning: "근면한" },
+                { word: "discretion", meaning: "재량" },
+                { word: "expedite", meaning: "촉진하다" },
+                { word: "feasible", meaning: "실현 가능한" }
+            ],
+            700: [
+                { word: "accreditation", meaning: "인가, 인증" },
+                { word: "adversely", meaning: "불리하게" },
+                { word: "arbitration", meaning: "중재" },
+                { word: "ascertain", meaning: "확인하다" },
+                { word: "circumvent", meaning: "회피하다" },
+                { word: "commensurate", meaning: "상응하는" },
+                { word: "concurrently", meaning: "동시에" },
+                { word: "constituency", meaning: "선거구, 지지자들" },
+                { word: "depreciation", meaning: "감가상각" },
+                { word: "detriment", meaning: "손해" },
+                { word: "discrepancy", meaning: "불일치" },
+                { word: "encompass", meaning: "포함하다" },
+                { word: "entitlement", meaning: "자격, 권리" },
+                { word: "foreseeable", meaning: "예측 가능한" },
+                { word: "incumbent", meaning: "현직의, 의무" }
+            ],
+            800: [
+                { word: "adjudicate", meaning: "판결하다" },
+                { word: "amalgamation", meaning: "합병" },
+                { word: "apprehensive", meaning: "불안한" },
+                { word: "clandestine", meaning: "비밀의" },
+                { word: "cogent", meaning: "설득력 있는" },
+                { word: "conglomerate", meaning: "대기업, 복합체" },
+                { word: "consortium", meaning: "컨소시엄" },
+                { word: "culminate", meaning: "정점에 달하다" },
+                { word: "efficacy", meaning: "효능" },
+                { word: "exacerbate", meaning: "악화시키다" },
+                { word: "fiduciary", meaning: "수탁자의" },
+                { word: "indemnify", meaning: "배상하다" },
+                { word: "jurisprudence", meaning: "법학" },
+                { word: "mitigate", meaning: "완화하다" },
+                { word: "pecuniary", meaning: "금전적인" }
+            ],
+            900: [
+                { word: "abrogation", meaning: "폐지" },
+                { word: "acquiesce", meaning: "묵인하다" },
+                { word: "ameliorate", meaning: "개선하다" },
+                { word: "ancillary", meaning: "보조적인" },
+                { word: "attrition", meaning: "마모, 감소" },
+                { word: "cognizant", meaning: "인지하는" },
+                { word: "commencement", meaning: "시작, 졸업식" },
+                { word: "corroborate", meaning: "확증하다" },
+                { word: "disseminate", meaning: "보급하다" },
+                { word: "eschew", meaning: "피하다" },
+                { word: "exonerate", meaning: "무죄를 선고하다" },
+                { word: "incontrovertible", meaning: "논쟁의 여지가 없는" },
+                { word: "jurisprudent", meaning: "법률에 정통한" },
+                { word: "promulgate", meaning: "공포하다" },
+                { word: "rescind", meaning: "철회하다" }
+            ],
+            1000: [
+                { word: "abnegation", meaning: "자기 부정" },
+                { word: "adumbrate", meaning: "암시하다" },
+                { word: "asseverate", meaning: "단언하다" },
+                { word: "circumlocution", meaning: "우회적 표현" },
+                { word: "concatenate", meaning: "연결하다" },
+                { word: "contumacious", meaning: "불손한" },
+                { word: "desuetude", meaning: "폐지, 불사용" },
+                { word: "efficacious", meaning: "효과적인" },
+                { word: "excoriate", meaning: "혹평하다" },
+                { word: "fecund", meaning: "다산의" },
+                { word: "obfuscate", meaning: "애매하게 하다" },
+                { word: "perspicacious", meaning: "통찰력 있는" },
+                { word: "recondite", meaning: "심오한" },
+                { word: "sycophant", meaning: "아첨꾼" },
+                { word: "verisimilitude", meaning: "진실처럼 보임" }
             ]
         };
 
