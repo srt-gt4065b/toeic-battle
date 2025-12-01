@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -206,6 +207,16 @@
         .player-status { font-size: 12px; color: #888; margin-top: 5px; }
         .player-status.ready { color: #4caf50; }
 
+        .waiting-dots {
+            display: inline-block;
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
         /* 배틀 게임 화면 */
         .game-screen {
             padding: 0;
@@ -219,22 +230,19 @@
             display: flex;
             justify-content: space-between;
             align-items: stretch;
-            padding: 4px !important;
-            height: 80px !important;
+            padding: 8px;
             background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
             gap: 10px;
-        }
+        
+    padding:4px !important;
+    height:80px !important;
+}
 
         .player-score-box {
             flex: 1;
             padding: 8px 12px;
             border-radius: 10px;
             text-align: center;
-            transition: transform 0.2s;
-        }
-        .player-score-box.pulse {
-            transform: scale(1.05);
-            filter: brightness(1.3);
         }
         .player-score-box.left {
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(102, 126, 234, 0.1));
@@ -667,13 +675,13 @@
     <div class="screen game-screen" id="gameScreen">
         <!-- 배틀모드: 양쪽 점수 표시 -->
         <div class="battle-header" id="battleHeader" style="display:none;">
-            <div class="player-score-box left" id="battleLeftBox">
+            <div class="player-score-box left">
                 <div class="name" id="battleLeftName">나</div>
                 <div class="score" id="battleLeftScore">0</div>
                 <div class="streak" id="battleLeftStreak"></div>
             </div>
             <div class="vs-badge">VS</div>
-            <div class="player-score-box right" id="battleRightBox">
+            <div class="player-score-box right">
                 <div class="name" id="battleRightName">상대</div>
                 <div class="score" id="battleRightScore">0</div>
                 <div class="streak" id="battleRightStreak"></div>
@@ -706,6 +714,7 @@
 
         <div class="battle-status" id="battleStatus" style="display:none;">
             <span class="question-num" id="battleQuestionNum">문제 1/10</span>
+            <span id="battleTimeLeft"></span>
         </div>
 
         <div class="question-box">
@@ -756,7 +765,28 @@
         </div>
     </div>
 
-    <!-- ===== 배틀 결과 화면 ===== -->
+    
+    <!-- ===== 레벨 클리어 화면 ===== -->
+    <div class="screen" id="levelClearScreen">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:10px; font-size:11px;">
+                <span style="color:#667eea;">🎓 우송대학교 AI경영학과</span>
+                <span style="color:#f093fb; margin-left:5px;">게임기반 학습플랫폼</span>
+            </div>
+            <div style="text-align:center; margin-bottom:15px;">
+                <div style="font-size:50px;">🏅</div>
+                <h2 style="margin:10px 0;">레벨 클리어!</h2>
+                <div id="levelClearMessage" style="font-size:14px; color:#ccc;"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn btn-primary" onclick="nextLevel()">🚀 다음 레벨로</button>
+                <button class="btn btn-secondary" onclick="restartLevel()">🔄 이 레벨 다시 도전</button>
+                <button class="btn btn-secondary" onclick="showScreen('levelScreen')">📚 레벨 선택으로</button>
+            </div>
+        </div>
+    </div>
+
+<!-- ===== 배틀 결과 화면 ===== -->
     <div class="screen" id="battleResultScreen">
         <div class="card battle-result">
             <div style="text-align:center; margin-bottom:10px; font-size:11px;">
@@ -806,18 +836,18 @@
         // ========================================
         const firebaseConfig = {
             apiKey: "AIzaSyAvU3l3c6qLOqtorOe_zlcs2oCj6PfF62o",
-            authDomain: "toeic-battle.firebaseapp.com",
-            databaseURL: "https://toeic-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "toeic-battle",
-            storageBucket: "toeic-battle.firebasestorage.app",
-            messagingSenderId: "949933180792",
-            appId: "1:949933180792:web:13772f58226882453d6a8d"
+  authDomain: "toeic-battle.firebaseapp.com",
+  databaseURL: "https://toeic-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "toeic-battle",
+  storageBucket: "toeic-battle.firebasestorage.app",
+  messagingSenderId: "949933180792",
+  appId: "1:949933180792:web:13772f58226882453d6a8d"
         };
         
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // 고정 가상 캔버스 크기
+        // 고정 가상 캔버스 크기 (모바일/PC 공통)
         const LOGICAL_WIDTH = 420;
         const LOGICAL_HEIGHT = 720;
 
@@ -829,6 +859,8 @@
         let roomCode = '';      // 현재 방 코드
         let roomRef = null;     // Firebase 방 레퍼런스
         let roomListener = null; // 방 상태 리스너
+
+        let battleSyncTimer = null;  // 배틀 실시간 동기화 타이머
 
         let player = {
             studentId: '',
@@ -844,8 +876,11 @@
             score: 0,
             correct: 0,
             wrong: 0,
-            streak: 0
-            // 위치 및 총알 동기화 삭제 (안정성 위해 점수만 동기화)
+            streak: 0,
+            shipX: null,
+            shipY: null,
+            bullets: [],
+            hitShakeTime: 0
         };
 
         let game = {
@@ -877,10 +912,12 @@
             animFrame: null,
             scaleFactor: 1,
             deviceScale: 1,
+            screenShakeTime: 0,
+            hitByOpponent: false,
             questionOrder: []  // 배틀모드용 문제 순서
         };
 
-        // 기본 단어
+        // 기본 단어 (Firebase 연결 실패 시)
         const defaultWords = {
             300: [
                 { word: "apple", meaning: "사과" },
@@ -899,9 +936,125 @@
                 { word: "friend", meaning: "친구" },
                 { word: "love", meaning: "사랑" }
             ],
-            400: [{ word: "achieve", meaning: "달성하다" }, { word: "benefit", meaning: "이익" }, { word: "consider", meaning: "고려하다" }, { word: "develop", meaning: "개발하다" }],
-            500: [{ word: "accommodate", meaning: "수용하다" }, { word: "acknowledge", meaning: "인정하다" }, { word: "adequate", meaning: "적절한" }, { word: "anticipate", meaning: "예상하다" }],
-            600: [{ word: "acquisition", meaning: "획득, 인수" }, { word: "allocate", meaning: "할당하다" }, { word: "amendment", meaning: "수정, 개정" }, { word: "authorize", meaning: "승인하다" }]
+            400: [
+                { word: "achieve", meaning: "달성하다" },
+                { word: "benefit", meaning: "이익" },
+                { word: "consider", meaning: "고려하다" },
+                { word: "develop", meaning: "개발하다" },
+                { word: "establish", meaning: "설립하다" },
+                { word: "facility", meaning: "시설" },
+                { word: "generate", meaning: "생성하다" },
+                { word: "identify", meaning: "확인하다" },
+                { word: "maintain", meaning: "유지하다" },
+                { word: "obtain", meaning: "얻다" },
+                { word: "provide", meaning: "제공하다" },
+                { word: "require", meaning: "요구하다" },
+                { word: "suggest", meaning: "제안하다" },
+                { word: "available", meaning: "이용 가능한" },
+                { word: "include", meaning: "포함하다" }
+            ],
+            500: [
+                { word: "accommodate", meaning: "수용하다" },
+                { word: "acknowledge", meaning: "인정하다" },
+                { word: "adequate", meaning: "적절한" },
+                { word: "anticipate", meaning: "예상하다" },
+                { word: "apparent", meaning: "명백한" },
+                { word: "approximate", meaning: "대략적인" },
+                { word: "associate", meaning: "연관시키다" },
+                { word: "comprehensive", meaning: "포괄적인" },
+                { word: "contribute", meaning: "기여하다" },
+                { word: "coordinate", meaning: "조정하다" },
+                { word: "demonstrate", meaning: "보여주다" },
+                { word: "distinguish", meaning: "구별하다" },
+                { word: "efficient", meaning: "효율적인" },
+                { word: "implement", meaning: "실행하다" },
+                { word: "indicate", meaning: "나타내다" }
+            ],
+            600: [
+                { word: "acquisition", meaning: "획득, 인수" },
+                { word: "allocate", meaning: "할당하다" },
+                { word: "amendment", meaning: "수정, 개정" },
+                { word: "authorize", meaning: "승인하다" },
+                { word: "comply", meaning: "준수하다" },
+                { word: "confidential", meaning: "기밀의" },
+                { word: "consecutive", meaning: "연속적인" },
+                { word: "consolidate", meaning: "통합하다" },
+                { word: "constraint", meaning: "제약" },
+                { word: "contingency", meaning: "비상사태" },
+                { word: "deteriorate", meaning: "악화되다" },
+                { word: "diligent", meaning: "근면한" },
+                { word: "discretion", meaning: "재량" },
+                { word: "expedite", meaning: "촉진하다" },
+                { word: "feasible", meaning: "실현 가능한" }
+            ],
+            700: [
+                { word: "accreditation", meaning: "인가, 인증" },
+                { word: "adversely", meaning: "불리하게" },
+                { word: "arbitration", meaning: "중재" },
+                { word: "ascertain", meaning: "확인하다" },
+                { word: "circumvent", meaning: "회피하다" },
+                { word: "commensurate", meaning: "상응하는" },
+                { word: "concurrently", meaning: "동시에" },
+                { word: "constituency", meaning: "선거구, 지지자들" },
+                { word: "depreciation", meaning: "감가상각" },
+                { word: "detriment", meaning: "손해" },
+                { word: "discrepancy", meaning: "불일치" },
+                { word: "encompass", meaning: "포함하다" },
+                { word: "entitlement", meaning: "자격, 권리" },
+                { word: "foreseeable", meaning: "예측 가능한" },
+                { word: "incumbent", meaning: "현직의, 의무" }
+            ],
+            800: [
+                { word: "adjudicate", meaning: "판결하다" },
+                { word: "amalgamation", meaning: "합병" },
+                { word: "apprehensive", meaning: "불안한" },
+                { word: "clandestine", meaning: "비밀의" },
+                { word: "cogent", meaning: "설득력 있는" },
+                { word: "conglomerate", meaning: "대기업, 복합체" },
+                { word: "consortium", meaning: "컨소시엄" },
+                { word: "culminate", meaning: "정점에 달하다" },
+                { word: "efficacy", meaning: "효능" },
+                { word: "exacerbate", meaning: "악화시키다" },
+                { word: "fiduciary", meaning: "수탁자의" },
+                { word: "indemnify", meaning: "배상하다" },
+                { word: "jurisprudence", meaning: "법학" },
+                { word: "mitigate", meaning: "완화하다" },
+                { word: "pecuniary", meaning: "금전적인" }
+            ],
+            900: [
+                { word: "abrogation", meaning: "폐지" },
+                { word: "acquiesce", meaning: "묵인하다" },
+                { word: "ameliorate", meaning: "개선하다" },
+                { word: "ancillary", meaning: "보조적인" },
+                { word: "attrition", meaning: "마모, 감소" },
+                { word: "cognizant", meaning: "인지하는" },
+                { word: "commencement", meaning: "시작, 졸업식" },
+                { word: "corroborate", meaning: "확증하다" },
+                { word: "disseminate", meaning: "보급하다" },
+                { word: "eschew", meaning: "피하다" },
+                { word: "exonerate", meaning: "무죄를 선고하다" },
+                { word: "incontrovertible", meaning: "논쟁의 여지가 없는" },
+                { word: "jurisprudent", meaning: "법률에 정통한" },
+                { word: "promulgate", meaning: "공포하다" },
+                { word: "rescind", meaning: "철회하다" }
+            ],
+            1000: [
+                { word: "abnegation", meaning: "자기 부정" },
+                { word: "adumbrate", meaning: "암시하다" },
+                { word: "asseverate", meaning: "단언하다" },
+                { word: "circumlocution", meaning: "우회적 표현" },
+                { word: "concatenate", meaning: "연결하다" },
+                { word: "contumacious", meaning: "불손한" },
+                { word: "desuetude", meaning: "폐지, 불사용" },
+                { word: "efficacious", meaning: "효과적인" },
+                { word: "excoriate", meaning: "혹평하다" },
+                { word: "fecund", meaning: "다산의" },
+                { word: "obfuscate", meaning: "애매하게 하다" },
+                { word: "perspicacious", meaning: "통찰력 있는" },
+                { word: "recondite", meaning: "심오한" },
+                { word: "sycophant", meaning: "아첨꾼" },
+                { word: "verisimilitude", meaning: "진실처럼 보임" }
+            ]
         };
 
         // ========================================
@@ -953,8 +1106,29 @@
             } catch (e) {}
         }
 
+        
         // ========================================
-        // 모드 선택 및 로그인
+        // 배틀 실시간 동기화 (내 우주선/총알 → Firebase)
+        // ========================================
+        function syncBattleState() {
+            if (gameMode !== 'battle' || !roomRef || !game.running) return;
+
+            const myPath = isHost ? 'host' : 'guest';
+
+            const payload = {
+                shipX: game.ship.x,
+                shipY: game.ship.y,
+                bullets: game.bullets.map(b => ({ x: b.x, y: b.y })), // 상대 표시용
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            roomRef.child('runtime').child(myPath).set(payload).catch(() => {
+                // 네트워크 에러는 조용히 무시
+            });
+        }
+
+// ========================================
+        // 모드 선택
         // ========================================
         function selectMode(mode) {
             gameMode = mode;
@@ -971,6 +1145,9 @@
             }
         }
 
+        // ========================================
+        // 로그인
+        // ========================================
         function login() {
             const studentId = document.getElementById('studentId').value.trim();
             const name = document.getElementById('playerName').value.trim();
@@ -993,7 +1170,7 @@
         }
 
         // ========================================
-        // 배틀 모드 로직
+        // 배틀 모드 - 방 생성
         // ========================================
         async function createRoom() {
             showLoading(true);
@@ -1015,6 +1192,7 @@
                         correct: 0,
                         wrong: 0,
                         streak: 0,
+                        ready: true,
                         answered: false
                     },
                     guest: null,
@@ -1028,9 +1206,13 @@
             } catch (error) {
                 showLoading(false);
                 showFeedback('방 생성 실패', '#f44336');
+                console.error(error);
             }
         }
 
+        // ========================================
+        // 배틀 모드 - 방 참가
+        // ========================================
         async function joinRoom() {
             const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             
@@ -1060,6 +1242,13 @@
                     return;
                 }
                 
+                if (roomData.status !== 'waiting') {
+                    showLoading(false);
+                    showFeedback('이미 게임이 진행 중입니다', '#f44336');
+                    return;
+                }
+                
+                // 게스트로 참가
                 await roomRef.child('guest').set({
                     name: player.name,
                     studentId: player.studentId,
@@ -1067,6 +1256,7 @@
                     correct: 0,
                     wrong: 0,
                     streak: 0,
+                    ready: true,
                     answered: false
                 });
                 
@@ -1080,9 +1270,13 @@
             } catch (error) {
                 showLoading(false);
                 showFeedback('방 참가 실패', '#f44336');
+                console.error(error);
             }
         }
 
+        // ========================================
+        // 대기실 표시
+        // ========================================
         function showWaitingRoom() {
             document.getElementById('displayRoomCode').textContent = roomCode;
             document.getElementById('player1Name').textContent = player.name + (isHost ? ' (방장)' : '');
@@ -1098,7 +1292,7 @@
         }
 
         // ========================================
-        // 방 상태 리스닝 (점수/상태 동기화)
+        // 방 상태 리스닝
         // ========================================
         function listenToRoom() {
             if (roomListener) {
@@ -1125,40 +1319,42 @@
                     updateWaitingUI(data);
                 }
                 
-                // 레벨 동기화
+                // 배틀 레벨 표시 (게스트용)
                 if (!isHost && data.level) {
                     player.currentLevel = data.level;
                 }
                 
-                // 게임 시작
+                // 상대방 실시간 위치/총알 동기화
+                if (data.runtime) {
+                    const oppRuntime = isHost ? data.runtime.guest : data.runtime.host;
+                    if (oppRuntime) {
+                        if (typeof oppRuntime.shipX === 'number') opponent.shipX = oppRuntime.shipX;
+                        if (typeof oppRuntime.shipY === 'number') opponent.shipY = oppRuntime.shipY;
+                        if (Array.isArray(oppRuntime.bullets)) {
+                            opponent.bullets = oppRuntime.bullets;
+                        }
+                    }
+                }
+
+                // 게임 시작 감지
                 if (data.status === 'playing' && !game.running) {
                     game.questionOrder = data.questionOrder || [];
                     startBattleGame();
                 }
                 
-                // 점수 실시간 동기화
+                // 게임 중 상대방 점수 업데이트
                 if (data.status === 'playing' && game.running) {
                     const opponentData = isHost ? data.guest : data.host;
                     if (opponentData) {
-                        const oldScore = opponent.score;
                         opponent.score = opponentData.score || 0;
                         opponent.correct = opponentData.correct || 0;
                         opponent.wrong = opponentData.wrong || 0;
                         opponent.streak = opponentData.streak || 0;
-                        
                         updateBattleScores();
-                        
-                        // 점수가 올랐으면 효과 주기
-                        if (opponent.score > oldScore) {
-                            const oppBox = document.getElementById('battleRightBox');
-                            oppBox.classList.remove('pulse');
-                            void oppBox.offsetWidth; // 리플로우
-                            oppBox.classList.add('pulse');
-                        }
                     }
                 }
                 
-                // 게임 종료
+                // 게임 종료 감지
                 if (data.status === 'finished') {
                     showBattleResult(data);
                 }
@@ -1167,6 +1363,7 @@
 
         function updateWaitingUI(data) {
             const hasGuest = !!data.guest;
+            
             document.getElementById('player2Slot').classList.toggle('filled', hasGuest);
             document.getElementById('player2Name').textContent = hasGuest ? opponent.name : '상대방';
             document.getElementById('player2Status').textContent = hasGuest ? '준비 완료!' : '접속 대기 중...';
@@ -1186,60 +1383,89 @@
             }
         }
 
+        // ========================================
+        // 배틀 레벨 선택
+        // ========================================
         function selectBattleLevel(level) {
             player.currentLevel = level;
+            
             document.querySelectorAll('#battleLevelGrid .level-btn').forEach(btn => {
                 btn.classList.remove('selected');
             });
             event.target.closest('.level-btn').classList.add('selected');
             
+            // Firebase에 레벨 업데이트
             if (isHost && roomRef) {
                 roomRef.child('level').set(level);
             }
         }
 
+        // ========================================
+        // 배틀 시작 (방장만)
+        // ========================================
         async function startBattle() {
             if (!isHost) return;
+            
             showLoading(true);
             
             try {
+                // 단어 로드
                 const snapshot = await database.ref(`toeic_galaga/words/level${player.currentLevel}`).once('value');
+                
                 if (snapshot.exists()) {
                     game.words = [];
-                    snapshot.forEach(child => { game.words.push(child.val()); });
+                    snapshot.forEach(child => {
+                        game.words.push(child.val());
+                    });
                 } else {
                     game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
                 }
                 
+                // 문제 순서 셔플 (10문제)
                 const numQuestions = Math.min(10, game.words.length);
-                const indices = Array.from({length: game.words.length}, (_, i) => i);
-                const shuffled = shuffleArray(indices).slice(0, numQuestions);
+                const indices = [];
+                for (let i = 0; i < game.words.length; i++) indices.push(i);
+                const shuffled = shuffleArray([...indices]).slice(0, numQuestions);
                 
+                // Firebase에 게임 상태 업데이트
                 await roomRef.update({
                     status: 'playing',
                     questionIndex: 0,
                     questionOrder: shuffled,
                     level: player.currentLevel
                 });
+                
                 showLoading(false);
+                
             } catch (error) {
                 showLoading(false);
                 showFeedback('게임 시작 실패', '#f44336');
+                console.error(error);
             }
         }
 
+        // ========================================
+        // 배틀 게임 시작
+        // ========================================
         async function startBattleGame() {
             showLoading(true);
+            
             try {
+                // 단어 로드
                 const snapshot = await database.ref(`toeic_galaga/words/level${player.currentLevel}`).once('value');
+                
                 if (snapshot.exists()) {
                     game.words = [];
-                    snapshot.forEach(child => { game.words.push(child.val()); });
+                    snapshot.forEach(child => {
+                        game.words.push(child.val());
+                    });
                 } else {
                     game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
                 }
                 
                 showLoading(false);
+                
+                // UI 설정
                 document.getElementById('battleHeader').style.display = 'flex';
                 document.getElementById('soloHeader').style.display = 'none';
                 document.getElementById('battleStatus').style.display = 'block';
@@ -1248,10 +1474,16 @@
                 document.getElementById('battleRightName').textContent = opponent.name;
                 
                 showScreen('gameScreen');
+                
                 setTimeout(() => {
                     initBattleGame();
                     requestAnimationFrame(gameLoop);
                 }, 100);
+
+                // 배틀 동기화 타이머 시작 (초당 약 8회 전송)
+                if (battleSyncTimer) clearInterval(battleSyncTimer);
+                battleSyncTimer = setInterval(syncBattleState, 120);
+                
             } catch (error) {
                 showLoading(false);
                 showFeedback('게임 로드 실패', '#f44336');
@@ -1261,6 +1493,7 @@
         function initBattleGame() {
             game.canvas = document.getElementById('gameCanvas');
             game.ctx = game.canvas.getContext('2d');
+            
             resizeCanvas();
             
             game.running = true;
@@ -1302,6 +1535,7 @@
             document.getElementById('koreanWord').textContent = game.currentWord.meaning;
             document.getElementById('battleQuestionNum').textContent = `문제 ${game.questionNumber}/${game.totalQuestions}`;
             
+            // 내 답변 상태 리셋
             const myPath = isHost ? 'host' : 'guest';
             roomRef.child(myPath).update({ answered: false });
             
@@ -1312,17 +1546,32 @@
             document.getElementById('battleLeftScore').textContent = game.score;
             document.getElementById('battleRightScore').textContent = opponent.score;
             
-            if (game.streak >= 3) document.getElementById('battleLeftStreak').textContent = `🔥 ${game.streak}연속!`;
-            else document.getElementById('battleLeftStreak').textContent = '';
+            if (game.streak >= 3) {
+                document.getElementById('battleLeftStreak').textContent = `🔥 ${game.streak}연속!`;
+            } else {
+                document.getElementById('battleLeftStreak').textContent = '';
+            }
             
-            if (opponent.streak >= 3) document.getElementById('battleRightStreak').textContent = `🔥 ${opponent.streak}연속!`;
-            else document.getElementById('battleRightStreak').textContent = '';
+            if (opponent.streak >= 3) {
+                document.getElementById('battleRightStreak').textContent = `🔥 ${opponent.streak}연속!`;
+            } else {
+                document.getElementById('battleRightStreak').textContent = '';
+            }
         }
 
+        // ========================================
+        // 배틀 종료
+        // ========================================
         async function endBattle() {
             game.running = false;
             if (game.animFrame) cancelAnimationFrame(game.animFrame);
 
+            if (battleSyncTimer) {
+                clearInterval(battleSyncTimer);
+                battleSyncTimer = null;
+            }
+
+            // 최종 점수 저장
             const myPath = isHost ? 'host' : 'guest';
             await roomRef.child(myPath).update({
                 score: game.score,
@@ -1331,6 +1580,7 @@
                 streak: game.streak
             });
             
+            // 방장만 게임 종료 처리
             if (isHost) {
                 setTimeout(async () => {
                     await roomRef.child('status').set('finished');
@@ -1344,18 +1594,28 @@
             
             const myData = isHost ? data.host : data.guest;
             const oppData = isHost ? data.guest : data.host;
+            
             const myScore = myData?.score || 0;
             const oppScore = oppData?.score || 0;
             
             let resultIcon, resultTitle, titleClass;
+            
             if (myScore > oppScore) {
-                resultIcon = '🏆'; resultTitle = '승리! (Victory!)'; titleClass = 'win';
-                playSound(523, 0.3, 'sine'); setTimeout(() => playSound(784, 0.3, 'sine'), 200);
+                resultIcon = '🏆';
+                resultTitle = '승리! (Victory!)';
+                titleClass = 'win';
+                playSound(523, 0.3, 'sine');
+                setTimeout(() => playSound(659, 0.3, 'sine'), 100);
+                setTimeout(() => playSound(784, 0.3, 'sine'), 200);
             } else if (myScore < oppScore) {
-                resultIcon = '😢'; resultTitle = '패배... (Defeat)'; titleClass = 'lose';
+                resultIcon = '😢';
+                resultTitle = '패배... (Defeat)';
+                titleClass = 'lose';
                 playSound(200, 0.3, 'sawtooth');
             } else {
-                resultIcon = '🤝'; resultTitle = '무승부! (Draw!)'; titleClass = 'draw';
+                resultIcon = '🤝';
+                resultTitle = '무승부! (Draw!)';
+                titleClass = 'draw';
                 playSound(440, 0.3, 'sine');
             }
             
@@ -1363,11 +1623,13 @@
             document.getElementById('battleResultTitle').textContent = resultTitle;
             document.getElementById('battleResultTitle').className = 'winner-title ' + titleClass;
             
+            // 내 점수 카드
             document.getElementById('leftCardName').textContent = player.name;
             document.getElementById('leftCardScore').textContent = myScore;
             document.getElementById('leftCardDetail').textContent = `정답 ${myData?.correct || 0} / 오답 ${myData?.wrong || 0}`;
             document.getElementById('leftScoreCard').className = 'battle-score-card ' + (myScore >= oppScore ? 'winner' : 'loser');
             
+            // 상대 점수 카드
             document.getElementById('rightCardName').textContent = opponent.name;
             document.getElementById('rightCardScore').textContent = oppScore;
             document.getElementById('rightCardDetail').textContent = `정답 ${oppData?.correct || 0} / 오답 ${oppData?.wrong || 0}`;
@@ -1377,77 +1639,450 @@
         }
 
         // ========================================
-        // 게임 엔진 (공통)
+        // 재대결 / 나가기
         // ========================================
+        async function rematch() {
+            if (isHost) {
+                // 방 초기화
+                await roomRef.update({
+                    status: 'waiting',
+                    questionIndex: 0,
+                    questionOrder: [],
+                    'host/score': 0,
+                    'host/correct': 0,
+                    'host/wrong': 0,
+                    'host/streak': 0,
+                    'host/answered': false,
+                    'guest/score': 0,
+                    'guest/correct': 0,
+                    'guest/wrong': 0,
+                    'guest/streak': 0,
+                    'guest/answered': false
+                });
+            }
+            showWaitingRoom();
+        }
+
+        function exitBattle() {
+            leaveRoom();
+            showScreen('loginScreen');
+        }
+
+        function leaveRoom() {
+            if (battleSyncTimer) {
+                clearInterval(battleSyncTimer);
+                battleSyncTimer = null;
+            }
+
+            if (roomListener && roomRef) {
+                roomRef.off('value', roomListener);
+            }
+            
+            if (isHost && roomRef) {
+                roomRef.remove();
+            } else if (roomRef) {
+                roomRef.child('guest').remove();
+            }
+            
+            roomRef = null;
+            roomCode = '';
+            isHost = false;
+        }
+
+        function copyRoomCode() {
+            navigator.clipboard.writeText(roomCode).then(() => {
+                showFeedback('📋 코드가 복사되었습니다!', '#4caf50');
+            }).catch(() => {
+                showFeedback('코드: ' + roomCode, '#4caf50');
+            });
+        }
+
+        // ========================================
+        // 솔로 모드 - 레벨 선택
+        // ========================================
+        function selectLevel(level) {
+            player.currentLevel = level;
+            startSoloGame();
+        }
+
+        async function startSoloGame() {
+            showLoading(true);
+            
+            try {
+                const snapshot = await database.ref(`toeic_galaga/words/level${player.currentLevel}`).once('value');
+                
+                if (snapshot.exists()) {
+                    game.words = [];
+                    snapshot.forEach(child => {
+                        game.words.push(child.val());
+                    });
+                } else {
+                    game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
+                }
+                
+                if (game.words.length < 4) {
+                    showFeedback('단어가 부족합니다', '#f44336');
+                    showLoading(false);
+                    return;
+                }
+                
+                // UI 설정
+                document.getElementById('battleHeader').style.display = 'none';
+                document.getElementById('soloHeader').style.display = 'block';
+                document.getElementById('battleStatus').style.display = 'none';
+                
+                showLoading(false);
+                showScreen('gameScreen');
+                
+                setTimeout(() => {
+                    initSoloGame();
+                    requestAnimationFrame(gameLoop);
+                }, 100);
+                
+            } catch (error) {
+                console.error('Error loading words:', error);
+                game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
+                showLoading(false);
+                showScreen('gameScreen');
+                setTimeout(() => {
+                    initSoloGame();
+                    requestAnimationFrame(gameLoop);
+                }, 100);
+            }
+        }
+
+        function initSoloGame() {
+            game.canvas = document.getElementById('gameCanvas');
+            game.ctx = game.canvas.getContext('2d');
+            
+            resizeCanvas();
+            
+            game.running = true;
+            game.score = 0;
+            game.correctCount = 0;
+            game.wrongCount = 0;
+            game.questionNumber = 0;
+            game.totalQuestions = game.words.length;
+            game.usedWordIndices = [];
+            game.wrongWords = [];
+            game.bullets = [];
+            game.enemies = [];
+            game.particles = [];
+            game.confetti = [];
+            game.streak = 0;
+            game.questionAnswered = false;
+            
+            game.ship.x = game.width / 2 - game.ship.width / 2;
+            game.ship.y = game.height - game.ship.height - 20;
+            
+            updateHeartsDisplay();
+            nextSoloQuestion();
+            setupControls();
+        }
+
+        function nextSoloQuestion() {
+            if (game.usedWordIndices.length >= game.words.length) {
+                missionSuccess();
+                return;
+            }
+            
+            let availableIndices = [];
+            for (let i = 0; i < game.words.length; i++) {
+                if (!game.usedWordIndices.includes(i)) {
+                    availableIndices.push(i);
+                }
+            }
+            
+            const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            game.usedWordIndices.push(randomIndex);
+            game.currentWord = game.words[randomIndex];
+            game.questionNumber++;
+            game.questionAnswered = false;
+            game.enemies = [];
+            game.bullets = [];
+            
+            document.getElementById('koreanWord').textContent = game.currentWord.meaning;
+            document.getElementById('questionDisplay').textContent = `${game.questionNumber}/${game.totalQuestions}`;
+            document.getElementById('scoreDisplay').textContent = game.score;
+            
+            spawnEnemies();
+        }
+
         function resizeCanvas() {
             if (!game.canvas) return;
+
             const canvas = game.canvas;
             const container = canvas.parentElement || document.body;
             const rect = container.getBoundingClientRect();
-            
-            let deviceWidth = rect.width || window.innerWidth;
-            let deviceHeight = rect.height || (window.innerHeight - 200);
 
+            let deviceWidth = rect.width;
+            let deviceHeight = rect.height;
+
+            if (!deviceWidth || !deviceHeight) {
+                deviceWidth = window.innerWidth;
+                deviceHeight = window.innerHeight - 200;
+            }
+
+            // 내부 논리 좌표계는 고정 (420 x 720)
             canvas.width = LOGICAL_WIDTH;
             canvas.height = LOGICAL_HEIGHT;
             game.width = LOGICAL_WIDTH;
             game.height = LOGICAL_HEIGHT;
 
-            const scale = Math.min(deviceWidth / LOGICAL_WIDTH, deviceHeight / LOGICAL_HEIGHT);
-            canvas.style.width = (LOGICAL_WIDTH * scale) + 'px';
-            canvas.style.height = (LOGICAL_HEIGHT * scale) + 'px';
+            // 디바이스 크기에 맞춰 CSS 스케일만 조정
+            const scale = Math.min(
+                deviceWidth / LOGICAL_WIDTH,
+                deviceHeight / LOGICAL_HEIGHT
+            );
+            const displayWidth = LOGICAL_WIDTH * scale;
+            const displayHeight = LOGICAL_HEIGHT * scale;
+
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+
             game.deviceScale = scale;
         }
 
+                function updateHeartsDisplay() {
+            const container = document.getElementById('heartsDisplay');
+            let html = '';
+            for (let i = 0; i < game.maxWrong; i++) {
+                if (i < game.maxWrong - game.wrongCount) {
+                    html += '<span class="heart">❤️</span>';
+                } else {
+                    html += '<span class="heart lost">🖤</span>';
+                }
+            }
+            container.innerHTML = html;
+        }
+
+        // ========================================
+        // 적 생성 (공통)
+        // ========================================
         function spawnEnemies() {
             const correctWord = game.currentWord.word;
-            const otherWords = game.words.filter(w => w.word !== correctWord).map(w => w.word);
+            
+            const otherWords = game.words
+                .filter(w => w.word !== correctWord)
+                .map(w => w.word);
             const wrongWords = shuffleArray([...otherWords]).slice(0, 3);
-            const allOptions = shuffleArray([{ text: correctWord, isCorrect: true }, ...wrongWords.map(w => ({ text: w, isCorrect: false }))]);
+            
+            const allOptions = shuffleArray([
+                { text: correctWord, isCorrect: true },
+                ...wrongWords.map(w => ({ text: w, isCorrect: false }))
+            ]);
             
             const padding = 10;
             const gap = 8;
             const availableWidth = game.width - (padding * 2);
             const isMobile = (window.innerWidth < 600);
+            
             let blockWidth, blockHeight, cols;
             
-            if (isMobile) { cols = 2; blockWidth = Math.min(120, (availableWidth - gap) / 2); blockHeight = 50; }
-            else { cols = 4; blockWidth = Math.min(130, (availableWidth - gap * 3) / 4); blockHeight = 55; }
+            if (isMobile) {
+                cols = 2;
+                blockWidth = Math.min(120, (availableWidth - gap) / 2);
+                blockHeight = 50;
+            } else {
+                cols = 4;
+                blockWidth = Math.min(130, (availableWidth - gap * 3) / 4);
+                blockHeight = 55;
+            }
             
             const totalGridWidth = (blockWidth * cols) + (gap * (cols - 1));
             const startX = (game.width - totalGridWidth) / 2;
             
             allOptions.forEach((option, i) => {
                 let col, row;
-                if (isMobile) { col = i % 2; row = Math.floor(i / 2); }
-                else { col = i; row = 0; }
+                if (isMobile) {
+                    col = i % 2;
+                    row = Math.floor(i / 2);
+                } else {
+                    col = i;
+                    row = 0;
+                }
                 
                 game.enemies.push({
                     x: startX + col * (blockWidth + gap),
                     y: -60 - row * (blockHeight + gap + 10) - (isMobile ? 0 : i * 20),
-                    width: blockWidth, height: blockHeight,
+                    width: blockWidth,
+                    height: blockHeight,
                     speed: 0.7 + Math.random() * 0.3,
-                    text: option.text, isCorrect: option.isCorrect,
-                    type: 'main', color: '#3949ab', glowColor: '#7986cb',
-                    destroyed: false, wobbleOffset: Math.random() * Math.PI * 2,
+                    text: option.text,
+                    isCorrect: option.isCorrect,
+                    type: 'main',
+                    color: '#3949ab',
+                    glowColor: '#7986cb',
+                    destroyed: false,
+                    wobbleOffset: Math.random() * Math.PI * 2,
                     baseX: startX + col * (blockWidth + gap),
                     maxWobble: Math.min(15, (game.width - totalGridWidth) / 4)
                 });
             });
         }
 
-        function shoot() {
-            if (!game.running || game.bullets.length >= 3) return;
-            game.bullets.push({ x: game.ship.x + game.ship.width / 2, y: game.ship.y - 10, radius: 12, speed: 10 });
-            playSound(150, 0.3, 'triangle');
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
         }
 
-        function checkCollision(bullet, enemy) {
-            const circleX = bullet.x; const circleY = bullet.y;
-            const closestX = Math.max(enemy.x, Math.min(circleX, enemy.x + enemy.width));
-            const closestY = Math.max(enemy.y, Math.min(circleY, enemy.y + enemy.height));
-            const distanceX = circleX - closestX; const distanceY = circleY - closestY;
-            return (distanceX * distanceX + distanceY * distanceY) < (bullet.radius * bullet.radius);
+        // ========================================
+        // 발사
+        // ========================================
+        function shoot() {
+            if (!game.running || game.bullets.length >= 3) return;
+            
+            game.bullets.push({
+                x: game.ship.x + game.ship.width / 2,
+                y: game.ship.y - 10,
+                radius: 12,
+                speed: 10,
+                glow: 1
+            });
+            
+            playSound(150, 0.3, 'triangle');
+            setTimeout(() => playSound(100, 0.2, 'triangle'), 50);
+        }
+
+        // ========================================
+        // 게임 루프
+        // ========================================
+        function gameLoop(timestamp) {
+            if (!game.running) return;
+            
+            if (game.width === 0 || game.height === 0) {
+                resizeCanvas();
+                game.ship.x = game.width / 2 - game.ship.width / 2;
+                game.ship.y = game.height - game.ship.height - 20;
+            }
+            
+            const dt = timestamp - game.lastTime;
+            game.lastTime = timestamp;
+            
+            update(dt);
+            render();
+            
+            game.animFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // 우주선 이동
+            if (game.keys['ArrowLeft'] || game.keys['KeyA']) {
+                game.ship.x -= game.ship.speed;
+            }
+            if (game.keys['ArrowRight'] || game.keys['KeyD']) {
+                game.ship.x += game.ship.speed;
+            }
+            
+            if (game.touchX !== null) {
+                const targetX = game.touchX - game.ship.width / 2;
+                game.ship.x += (targetX - game.ship.x) * 0.15;
+            }
+            
+            game.ship.x = Math.max(0, Math.min(game.width - game.ship.width, game.ship.x));
+            
+            // 대포알 이동
+            game.bullets = game.bullets.filter(b => {
+                b.y -= b.speed;
+                return b.y > -b.radius;
+            });
+            
+            // 적 이동 및 충돌
+            let mainEnemyCount = 0;
+            let allMainEnemiesGone = true;
+            
+            game.enemies.forEach(enemy => {
+                if (enemy.destroyed) return;
+                
+                if (enemy.type === 'main') {
+                    mainEnemyCount++;
+                    if (enemy.y < game.height) {
+                        allMainEnemiesGone = false;
+                    }
+                }
+                
+                enemy.y += enemy.speed;
+                
+                const wobble = Math.sin(Date.now() / 500 + enemy.wobbleOffset) * (enemy.maxWobble || 10);
+                const newX = (enemy.baseX || enemy.x) + wobble;
+                
+                if (newX >= 5 && newX + enemy.width <= game.width - 5) {
+                    enemy.x = newX;
+                }
+                
+                // 충돌
+                game.bullets.forEach((bullet, bi) => {
+                    if (checkCollision(bullet, enemy)) {
+                        game.bullets.splice(bi, 1);
+                        enemy.destroyed = true;
+                        
+                        if (enemy.isCorrect) {
+                            handleCorrectAnswer(enemy);
+                        } else if (enemy.type === 'main') {
+                            handleWrongAnswer(enemy);
+                        }
+                    }
+                });
+            });
+            
+            // 시간 초과
+            if (mainEnemyCount > 0 && allMainEnemiesGone && !game.questionAnswered) {
+                handleTimeout();
+            }
+            
+            // 파티클
+            game.particles = game.particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.15;
+                p.life--;
+                return p.life > 0;
+            });
+            
+            game.confetti = game.confetti.filter(c => {
+                c.x += c.vx;
+                c.y += c.vy;
+                c.vy += 0.1;
+                c.rotation += c.rotationSpeed;
+                c.life--;
+                return c.life > 0;
+            });
+            
+            game.enemies = game.enemies.filter(e => !e.destroyed && e.y < game.height + 100);
+        }
+
+        // 배틀 모드: 상대 총알과 내 우주선 충돌 판정
+        function bulletHitsShip(bullet, ship) {
+            if (!bullet || !ship) return false;
+
+            const radius = bullet.radius || 10;
+            const circleX = bullet.x;
+            const circleY = bullet.y;
+
+            const closestX = Math.max(ship.x, Math.min(circleX, ship.x + ship.width));
+            const closestY = Math.max(ship.y, Math.min(circleY, ship.y + ship.height));
+
+            const dx = circleX - closestX;
+            const dy = circleY - closestY;
+            return (dx * dx + dy * dy) < radius * radius;
+        }
+
+        function handleShipHitByOpponent() {
+            if (game.hitByOpponent || !game.running) return;
+
+            game.hitByOpponent = true;
+            game.screenShakeTime = 300;
+            game.streak = 0;
+
+            showFeedback('💥 상대의 공격을 맞았습니다!', '#e91e63');
+            playSound(180, 0.25, 'sawtooth');
+
+            setTimeout(() => {
+                game.hitByOpponent = false;
+            }, 400);
         }
 
         function handleCorrectAnswer(enemy) {
@@ -1458,37 +2093,36 @@
             game.questionAnswered = true;
             playSound(523, 0.3, 'sine');
             
-            // 점수가 오르면 내 점수판 강조
-            if (gameMode === 'battle') {
-                const leftBox = document.getElementById('battleLeftBox');
-                leftBox.classList.remove('pulse');
-                void leftBox.offsetWidth;
-                leftBox.classList.add('pulse');
-
-                if (roomRef) {
-                    const myPath = isHost ? 'host' : 'guest';
-                    roomRef.child(myPath).update({
-                        score: game.score,
-                        correct: game.correctCount,
-                        streak: game.streak,
-                        answered: true
-                    });
-                }
+            // 배틀모드: Firebase 업데이트
+            if (gameMode === 'battle' && roomRef) {
+                const myPath = isHost ? 'host' : 'guest';
+                roomRef.child(myPath).update({
+                    score: game.score,
+                    correct: game.correctCount,
+                    streak: game.streak,
+                    answered: true
+                });
             }
             
+            // 5연속 보너스
             if (game.streak > 0 && game.streak % 5 === 0) {
                 createConfetti();
-                const bonus = (Math.floor((player.currentLevel - 300) / 100) + 1) * 1000;
-                game.score += bonus;
-                showFeedback(`🎊 ${game.streak}연속 정답! +${bonus}점`, '#ff6b9d');
-                playSound(988, 0.3, 'sine');
+                const bonusMultiplier = Math.floor((player.currentLevel - 300) / 100) + 1;
+                const bonusScore = bonusMultiplier * 1000;
+                game.score += bonusScore;
+                showFeedback(`🎊🎈 ${game.streak}연속 정답! 🎈🎊\n🎁 +${bonusScore.toLocaleString()}점 보너스!`, '#ff6b9d');
+                playSound(784, 0.3, 'sine');
+                setTimeout(() => playSound(988, 0.3, 'sine'), 100);
+                setTimeout(() => playSound(1175, 0.3, 'sine'), 200);
                 
                 if (gameMode === 'battle' && roomRef) {
                     const myPath = isHost ? 'host' : 'guest';
                     roomRef.child(myPath + '/score').set(game.score);
                 }
             } else {
-                showFeedback('🎉 정답! +100점', '#4caf50');
+                const praises = ['🎉 정답!', '⭐ 완벽!', '🔥 굿!', '💯 최고!', '🚀 멋져!', '👏 브라보!', '🏆 챔피언!', '✨ 정답!'];
+                const praise = praises[Math.floor(Math.random() * praises.length)];
+                showFeedback(praise + ' +100점', '#4caf50');
             }
             
             if (gameMode === 'battle') {
@@ -1504,15 +2138,17 @@
             createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ff4444');
             game.wrongCount++;
             game.streak = 0;
-            game.questionAnswered = true;
             game.wrongWords.push(game.currentWord);
+            game.questionAnswered = true;
             playSound(200, 0.2, 'sawtooth');
             
-            if (gameMode === 'battle') {
-                if (roomRef) {
-                    const myPath = isHost ? 'host' : 'guest';
-                    roomRef.child(myPath).update({ wrong: game.wrongCount, streak: 0, answered: true });
-                }
+            if (gameMode === 'battle' && roomRef) {
+                const myPath = isHost ? 'host' : 'guest';
+                roomRef.child(myPath).update({
+                    wrong: game.wrongCount,
+                    streak: 0,
+                    answered: true
+                });
                 updateBattleScores();
                 showFeedback(`❌ 오답!\n정답: ${game.currentWord.word}`, '#f44336');
                 setTimeout(() => nextBattleQuestion(), 1500);
@@ -1522,151 +2158,476 @@
                     showFeedback('💔 기회를 모두 잃었어요!', '#f44336');
                     setTimeout(() => gameOver(), 1500);
                 } else {
-                    showFeedback(`❌ 오답!\n정답: ${game.currentWord.word}`, '#f44336');
+                    showFeedback(`❌ 오답!\n정답: ${game.currentWord.word}\n남은 기회: ${game.maxWrong - game.wrongCount}`, '#f44336');
                     setTimeout(() => nextSoloQuestion(), 1500);
                 }
             }
         }
 
-        // ========================================
-        // 렌더링 및 루프
-        // ========================================
-        function gameLoop(timestamp) {
-            if (!game.running) return;
-            const dt = timestamp - game.lastTime;
-            game.lastTime = timestamp;
+        function handleTimeout() {
+            game.questionAnswered = true;
+            game.wrongCount++;
+            game.streak = 0;
+            game.wrongWords.push(game.currentWord);
             
-            update(dt);
-            render();
-            game.animFrame = requestAnimationFrame(gameLoop);
-        }
-
-        function update(dt) {
-            // 우주선 이동
-            if (game.keys['ArrowLeft']) game.ship.x -= game.ship.speed;
-            if (game.keys['ArrowRight']) game.ship.x += game.ship.speed;
-            if (game.touchX !== null) game.ship.x += (game.touchX - game.ship.width/2 - game.ship.x) * 0.15;
-            game.ship.x = Math.max(0, Math.min(game.width - game.ship.width, game.ship.x));
-            
-            // 총알
-            game.bullets = game.bullets.filter(b => { b.y -= b.speed; return b.y > -b.radius; });
-            
-            // 적 이동 및 충돌
-            let mainCount = 0, allGone = true;
-            game.enemies.forEach(enemy => {
-                if (enemy.destroyed) return;
-                if (enemy.type === 'main') { mainCount++; if (enemy.y < game.height) allGone = false; }
-                
-                enemy.y += enemy.speed;
-                enemy.x = (enemy.baseX || enemy.x) + Math.sin(Date.now()/500 + enemy.wobbleOffset) * (enemy.maxWobble || 10);
-                
-                game.bullets.forEach((bullet, bi) => {
-                    if (checkCollision(bullet, enemy)) {
-                        game.bullets.splice(bi, 1);
-                        enemy.destroyed = true;
-                        if (enemy.isCorrect) handleCorrectAnswer(enemy);
-                        else if (enemy.type === 'main') handleWrongAnswer(enemy);
-                    }
+            if (gameMode === 'battle' && roomRef) {
+                const myPath = isHost ? 'host' : 'guest';
+                roomRef.child(myPath).update({
+                    wrong: game.wrongCount,
+                    streak: 0,
+                    answered: true
                 });
-            });
-            
-            if (mainCount > 0 && allGone && !game.questionAnswered) handleWrongAnswer(game.enemies[0]); // 타임아웃 처리
-
-            // 파티클
-            game.particles = game.particles.filter(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.life--; return p.life>0; });
-            game.confetti = game.confetti.filter(c => { c.x+=c.vx; c.y+=c.vy; c.vy+=0.1; c.rotation+=c.rotationSpeed; c.life--; return c.life>0; });
+                updateBattleScores();
+                showFeedback(`⏰ 시간 초과!\n정답: ${game.currentWord.word}`, '#ff9800');
+                playSound(150, 0.3, 'sawtooth');
+                setTimeout(() => nextBattleQuestion(), 1500);
+            } else {
+                updateHeartsDisplay();
+                if (game.wrongCount >= game.maxWrong) {
+                    showFeedback('💔 기회를 모두 잃었어요!', '#f44336');
+                    setTimeout(() => gameOver(), 1500);
+                } else {
+                    showFeedback(`⏰ 시간 초과!\n정답: ${game.currentWord.word}\n남은 기회: ${game.maxWrong - game.wrongCount}`, '#ff9800');
+                    playSound(150, 0.3, 'sawtooth');
+                    setTimeout(() => nextSoloQuestion(), 1500);
+                }
+            }
         }
 
+        function checkCollision(bullet, enemy) {
+            const circleX = bullet.x;
+            const circleY = bullet.y;
+            const radius = bullet.radius || 12;
+            
+            const closestX = Math.max(enemy.x, Math.min(circleX, enemy.x + enemy.width));
+            const closestY = Math.max(enemy.y, Math.min(circleY, enemy.y + enemy.height));
+            
+            const distanceX = circleX - closestX;
+            const distanceY = circleY - closestY;
+            const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+            
+            return distance < radius;
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                game.particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    color: color,
+                    life: 30 + Math.random() * 20
+                });
+            }
+        }
+
+        function createConfetti() {
+            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43'];
+            const launchPoints = [
+                { x: game.width * 0.2, y: game.height },
+                { x: game.width * 0.5, y: game.height },
+                { x: game.width * 0.8, y: game.height }
+            ];
+            
+            launchPoints.forEach(point => {
+                for (let i = 0; i < 30; i++) {
+                    game.confetti.push({
+                        x: point.x + (Math.random() - 0.5) * 50,
+                        y: point.y,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: -8 - Math.random() * 10,
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: 5 + Math.random() * 8,
+                        shape: Math.random() > 0.5 ? 'rect' : 'circle',
+                        rotation: Math.random() * 360,
+                        rotationSpeed: (Math.random() - 0.5) * 15,
+                        life: 80 + Math.random() * 40
+                    });
+                }
+            });
+        }
+
+        // ========================================
+        // 렌더링
+        // ========================================
         function render() {
             const ctx = game.ctx;
+            
             ctx.fillStyle = '#0a0a15';
             ctx.fillRect(0, 0, game.width, game.height);
             
-            // 별 배경
-            const time = Date.now() / 1000;
-            for (let i=0; i<50; i++) {
-                ctx.fillStyle = `rgba(255,255,255,${0.3 + Math.sin(time*2+i)*0.2})`;
-                ctx.fillRect((i*137.5)%game.width, ((i*73.3+time*20)%game.height), 2, 2);
-            }
+            drawStars();
             
-            // 적 그리기
+            // 적 (단어 블록)
             game.enemies.forEach(enemy => {
                 if (enemy.destroyed) return;
+                
                 ctx.save();
-                ctx.shadowColor = enemy.glowColor; ctx.shadowBlur = 15;
-                const grad = ctx.createLinearGradient(enemy.x, enemy.y, enemy.x, enemy.y+enemy.height);
-                grad.addColorStop(0, '#5c6bc0'); grad.addColorStop(1, '#3949ab');
-                ctx.fillStyle = grad;
-                ctx.beginPath(); ctx.roundRect(enemy.x, enemy.y, enemy.width, enemy.height, 8); ctx.fill();
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.stroke();
-                ctx.fillStyle = 'white'; ctx.font = `bold ${Math.max(14, Math.floor(18 * game.scaleFactor))}px Arial`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(enemy.text, enemy.x+enemy.width/2, enemy.y+enemy.height/2);
+                ctx.shadowColor = enemy.glowColor;
+                ctx.shadowBlur = 15;
+                
+                const gradient = ctx.createLinearGradient(enemy.x, enemy.y, enemy.x, enemy.y + enemy.height);
+                gradient.addColorStop(0, '#5c6bc0');
+                gradient.addColorStop(1, '#3949ab');
+                ctx.fillStyle = gradient;
+                
+                ctx.beginPath();
+                ctx.roundRect(enemy.x, enemy.y, enemy.width, enemy.height, 8);
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'white';
+                const fontSize = Math.max(14, Math.floor(18 * game.scaleFactor));
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(enemy.text, enemy.x + enemy.width/2, enemy.y + enemy.height/2);
                 ctx.restore();
             });
             
-            // 총알 그리기
-            game.bullets.forEach(b => {
-                ctx.save(); ctx.shadowColor='#ff6600'; ctx.shadowBlur=20;
-                const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.radius);
-                grad.addColorStop(0,'#fff'); grad.addColorStop(0.6,'#ff6600');
-                ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2); ctx.fill();
+            // 대포알
+            game.bullets.forEach(bullet => {
+                ctx.save();
+                ctx.shadowColor = '#ff6600';
+                ctx.shadowBlur = 20;
+                
+                const gradient = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, bullet.radius);
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.3, '#ffcc00');
+                gradient.addColorStop(0.6, '#ff6600');
+                gradient.addColorStop(1, '#cc3300');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.beginPath();
+                ctx.arc(bullet.x - 3, bullet.y - 3, bullet.radius * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
                 ctx.restore();
             });
             
-            // 내 우주선 그리기
+            // 상대방 총알 (배틀 모드)
+            if (gameMode === 'battle' && opponent.bullets && opponent.bullets.length) {
+                opponent.bullets.forEach(b => {
+                    if (!b) return;
+                    ctx.save();
+                    ctx.shadowColor = '#ff80bf';
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = '#ff80bf';
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+
+            // 우주선
             drawShip();
+
+            // 상대 우주선
+            if (gameMode === 'battle' && opponent.shipX != null) {
+                drawOpponentShip();
+            }
             
-            // 효과 그리기
-            game.particles.forEach(p => { ctx.fillStyle=p.color; ctx.globalAlpha=p.life/50; ctx.fillRect(p.x-3,p.y-3,6,6); });
+            // 파티클
+            game.particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life / 50;
+                ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
+            });
+            ctx.globalAlpha = 1;
+            
+            // 풍선폭죽
             game.confetti.forEach(c => {
-                ctx.save(); ctx.globalAlpha=Math.min(1, c.life/30); ctx.fillStyle=c.color;
-                ctx.translate(c.x,c.y); ctx.rotate(c.rotation*Math.PI/180);
-                ctx.fillRect(-c.size/2, -c.size/4, c.size, c.size/2);
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, c.life / 30);
+                ctx.fillStyle = c.color;
+                ctx.translate(c.x, c.y);
+                ctx.rotate(c.rotation * Math.PI / 180);
+                
+                if (c.shape === 'rect') {
+                    ctx.fillRect(-c.size/2, -c.size/4, c.size, c.size/2);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, c.size/2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 ctx.restore();
             });
-            ctx.globalAlpha=1;
+            ctx.globalAlpha = 1;
+        }
+
+        function drawStars() {
+            const ctx = game.ctx;
+            const time = Date.now() / 1000;
+            
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 137.5) % game.width;
+                const y = ((i * 73.3 + time * 20) % game.height);
+                const brightness = 0.3 + Math.sin(time * 2 + i) * 0.2;
+                ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+                ctx.fillRect(x, y, 2, 2);
+            }
         }
 
         function drawShip() {
-            const ctx = game.ctx, x = game.ship.x, y = game.ship.y, w = game.ship.width, h = game.ship.height;
-            ctx.save(); ctx.shadowColor='#00ffff'; ctx.shadowBlur=15;
-            ctx.fillStyle='#4fc3f7';
-            ctx.beginPath(); ctx.moveTo(x+w/2,y); ctx.lineTo(x+w,y+h); ctx.lineTo(x+w/2,y+h*0.7); ctx.lineTo(x,y+h); ctx.fill();
+            const ctx = game.ctx;
+            const x = game.ship.x;
+            const y = game.ship.y;
+            const w = game.ship.width;
+            const h = game.ship.height;
+            
+            ctx.save();
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 15;
+            
+            ctx.fillStyle = '#4fc3f7';
+            ctx.beginPath();
+            ctx.moveTo(x + w/2, y);
+            ctx.lineTo(x + w, y + h);
+            ctx.lineTo(x + w/2, y + h * 0.7);
+            ctx.lineTo(x, y + h);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = '#81d4fa';
+            ctx.beginPath();
+            ctx.moveTo(x + w/2, y + 5);
+            ctx.lineTo(x + w - 8, y + h - 5);
+            ctx.lineTo(x + w/2, y + h * 0.65);
+            ctx.closePath();
+            ctx.fill();
+            
             ctx.restore();
-            ctx.fillStyle = `hsl(${30+Math.random()*30},100%,60%)`;
-            ctx.beginPath(); ctx.moveTo(x+w*0.3,y+h); ctx.lineTo(x+w/2,y+h+10+Math.random()*8); ctx.lineTo(x+w*0.7,y+h); ctx.fill();
+            
+            // 엔진 불꽃
+            ctx.fillStyle = `hsl(${30 + Math.random() * 30}, 100%, 60%)`;
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.3, y + h);
+            ctx.lineTo(x + w/2, y + h + 10 + Math.random() * 8);
+            ctx.lineTo(x + w * 0.7, y + h);
+            ctx.fill();
         }
 
-        // 이펙트 생성
-        function createExplosion(x, y, color) {
-            for(let i=0; i<20; i++) game.particles.push({x, y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, color, life:30+Math.random()*20});
-        }
-        function createConfetti() {
-            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3'];
-            [0.2, 0.5, 0.8].forEach(pos => {
-                for(let i=0; i<20; i++) game.confetti.push({
-                    x: game.width*pos, y: game.height, vx:(Math.random()-0.5)*8, vy:-10-Math.random()*5,
-                    color: colors[Math.floor(Math.random()*4)], size: 5+Math.random()*8, rotation:0, rotationSpeed:(Math.random()-0.5)*15, life:80+Math.random()*40
-                });
-            });
-        }
 
-        // 기타 기능 (셔플, 컨트롤 등)
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
+
+        // 상대 우주선 렌더링
+        function drawOpponentShip() {
+            const ctx = game.ctx;
+            if (!ctx) return;
+            if (opponent.shipX == null) return;
+
+            const w = game.ship.width;
+            const h = game.ship.height;
+
+            const x = opponent.shipX;
+            const y = 50; // 상단 고정 위치
+
+            ctx.save();
+            ctx.shadowColor = '#ff80bf';
+            ctx.shadowBlur = 15;
+
+            ctx.fillStyle = '#ff4f8b';
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y);
+            ctx.lineTo(x + w, y + h);
+            ctx.lineTo(x + w / 2, y + h * 0.7);
+            ctx.lineTo(x, y + h);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ff9ecd';
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y + 5);
+            ctx.lineTo(x + w - 8, y + h - 5);
+            ctx.lineTo(x + w / 2, y + h * 0.65);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
         }
+        // ========================================
+        // 결과 화면 (솔로)
+        // ========================================
         
+        function missionSuccess() {
+            // 현재 레벨의 모든 문제를 풀었을 때 호출되는 함수 (솔로 모드)
+            game.running = false;
+            if (game.animFrame) cancelAnimationFrame(game.animFrame);
+
+            // 누적 점수 및 클리어 레벨 기록
+            player.totalScore += game.score;
+            player.passedLevels.push(player.currentLevel);
+
+            // 리더보드 저장
+            saveScore();
+
+            // 레벨 클리어 메시지 구성
+            const msgEl = document.getElementById('levelClearMessage');
+            if (msgEl) {
+                const levelText = `${player.currentLevel}점 레벨을 클리어했습니다!`;
+                const scoreText = `이번 레벨 점수: ${game.score.toLocaleString()}점`;
+                const correctText = `정답 ${game.correctCount}개 / 오답 ${game.wrongCount}개`;
+                msgEl.textContent = levelText + ' ' + scoreText + ' (' + correctText + ')';
+            }
+
+            // 레벨 클리어 전용 화면으로 전환
+            showScreen('levelClearScreen');
+
+            // 축하 사운드
+            playSound(523, 0.3, 'sine');
+            setTimeout(() => playSound(659, 0.3, 'sine'), 100);
+            setTimeout(() => playSound(784, 0.3, 'sine'), 200);
+        }
+
+
+        function nextLevel() {
+            // 다음 레벨로 진행 (100점 단위 레벨업)
+            let next = player.currentLevel + 100;
+
+            // 990+ 이후에는 레벨 선택 화면으로
+            if (next > 1000) {
+                showFeedback('모든 레벨을 클리어했습니다! 축하합니다! 🎉', '#4caf50');
+                showScreen('levelScreen');
+                return;
+            }
+
+            player.currentLevel = next;
+
+            // 솔로 모드 기준으로 즉시 다음 레벨 시작
+            if (gameMode === 'solo') {
+                startSoloGame();
+            } else {
+                // 혹시 배틀 모드에서 호출될 경우를 대비한 방어 코드
+                showScreen('waitingRoomScreen');
+            }
+        }
+
+function gameOver() {
+            game.running = false;
+            if (game.animFrame) cancelAnimationFrame(game.animFrame);
+            
+            document.getElementById('resultIcon').textContent = '💔';
+            document.getElementById('resultTitle').textContent = '게임 오버';
+            document.getElementById('resultScore').textContent = game.score;
+            document.getElementById('resultCorrect').textContent = game.correctCount;
+            document.getElementById('resultWrong').textContent = game.wrongCount;
+            
+            showScreen('resultScreen');
+        }
+
+        function restartLevel() {
+            if (gameMode === 'battle') {
+                showWaitingRoom();
+            } else {
+                startSoloGame();
+            }
+        }
+
+        // ========================================
+        // 점수 저장/로드
+        // ========================================
+        function saveScore() {
+            const scoreData = {
+                studentId: player.studentId,
+                playerName: player.name,
+                totalScore: player.totalScore,
+                levelScore: game.score,
+                level: player.currentLevel,
+                passedLevels: player.passedLevels,
+                correct: game.correctCount,
+                wrong: game.wrongCount,
+                total: game.totalQuestions,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                date: new Date().toLocaleString('ko-KR')
+            };
+            
+            database.ref('toeic_galaga/scores').push(scoreData);
+        }
+
+        async function loadLeaderboard() {
+            const list = document.getElementById('leaderboardList');
+            list.innerHTML = '<div style="text-align:center; padding:20px;">로딩 중...</div>';
+            
+            try {
+                const snapshot = await database.ref('toeic_galaga/scores')
+                    .orderByChild('totalScore')
+                    .limitToLast(50)
+                    .once('value');
+                
+                const scores = [];
+                snapshot.forEach(child => {
+                    scores.push(child.val());
+                });
+                
+                scores.sort((a, b) => b.totalScore - a.totalScore);
+                
+                // 중복 제거
+                const uniqueScores = [];
+                const seenIds = new Set();
+                scores.forEach(score => {
+                    if (!seenIds.has(score.studentId)) {
+                        seenIds.add(score.studentId);
+                        uniqueScores.push(score);
+                    }
+                });
+                
+                if (uniqueScores.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">아직 기록이 없습니다</div>';
+                    return;
+                }
+                
+                let html = '';
+                uniqueScores.slice(0, 10).forEach((score, index) => {
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+                    html += `
+                        <div style="display:flex; align-items:center; padding:10px; border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <div style="width:35px; font-size:18px; text-align:center;">${medal}</div>
+                            <div style="flex:1;">
+                                <div style="font-weight:bold;">${score.playerName}</div>
+                                <div style="font-size:11px; color:#888;">${score.studentId}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:bold; color:#ffd700;">${score.totalScore?.toLocaleString() || 0}</div>
+                                <div style="font-size:11px; color:#888;">Lv.${score.level || 300}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                list.innerHTML = html;
+                
+            } catch (error) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#f44336;">로드 실패</div>';
+            }
+        }
+
+        // ========================================
+        // 컨트롤
+        // ========================================
         function setupControls() {
-            document.addEventListener('keydown', e => { game.keys[e.code] = true; if(e.code==='Space'){e.preventDefault(); shoot();} });
-            document.addEventListener('keyup', e => game.keys[e.code] = false);
-            game.canvas.addEventListener('touchstart', e => { e.preventDefault(); const r=game.canvas.getBoundingClientRect(); game.touchX=(e.touches[0].clientX-r.left)*(game.width/r.width); }, {passive:false});
-            game.canvas.addEventListener('touchmove', e => { e.preventDefault(); const r=game.canvas.getBoundingClientRect(); game.touchX=(e.touches[0].clientX-r.left)*(game.width/r.width); }, {passive:false});
-            game.canvas.addEventListener('touchend', () => { game.touchX=null; shoot(); });
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            
+            const canvas = game.canvas;
+            canvas.removeEventListener('touchstart', handleTouchStart);
+            canvas.removeEventListener('touchmove', handleTouchMove);
+            canvas.removeEventListener('touchend', handleTouchEnd);
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd);
+            
             document.getElementById('leftBtn').ontouchstart = (e) => { e.preventDefault(); game.keys['ArrowLeft'] = true; };
             document.getElementById('leftBtn').ontouchend = () => game.keys['ArrowLeft'] = false;
             document.getElementById('rightBtn').ontouchstart = (e) => { e.preventDefault(); game.keys['ArrowRight'] = true; };
@@ -1674,49 +2635,48 @@
             document.getElementById('fireBtn').ontouchstart = (e) => { e.preventDefault(); shoot(); };
         }
 
-        // 솔로 모드 관련 함수 (축약됨)
-        function selectLevel(level) { player.currentLevel = level; startSoloGame(); }
-        async function startSoloGame() {
-            showLoading(true);
-            game.words = [...(defaultWords[player.currentLevel] || defaultWords[300])];
-            showLoading(false);
-            document.getElementById('battleHeader').style.display='none';
-            document.getElementById('soloHeader').style.display='block';
-            document.getElementById('battleStatus').style.display='none';
-            showScreen('gameScreen');
-            setTimeout(() => { initSoloGame(); requestAnimationFrame(gameLoop); }, 100);
+        function handleKeyDown(e) {
+            game.keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                shoot();
+            }
         }
-        function initSoloGame() {
-            game.canvas=document.getElementById('gameCanvas'); game.ctx=game.canvas.getContext('2d'); resizeCanvas();
-            game.running=true; game.score=0; game.correctCount=0; game.wrongCount=0; game.questionNumber=0; game.totalQuestions=game.words.length;
-            game.usedWordIndices=[]; game.bullets=[]; game.enemies=[];
-            game.ship.x=game.width/2-game.ship.width/2; game.ship.y=game.height-game.ship.height-20;
-            updateHeartsDisplay(); nextSoloQuestion(); setupControls();
+
+        function handleKeyUp(e) {
+            game.keys[e.code] = false;
         }
-        function nextSoloQuestion() {
-            if(game.usedWordIndices.length>=game.words.length) { missionSuccess(); return; }
-            const available = game.words.map((_,i)=>i).filter(i=>!game.usedWordIndices.includes(i));
-            const idx = available[Math.floor(Math.random()*available.length)];
-            game.usedWordIndices.push(idx); game.currentWord=game.words[idx];
-            game.questionNumber++; game.questionAnswered=false; game.enemies=[]; game.bullets=[];
-            document.getElementById('koreanWord').textContent=game.currentWord.meaning;
-            document.getElementById('questionDisplay').textContent=`${game.questionNumber}/${game.totalQuestions}`;
-            spawnEnemies();
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = game.canvas.getBoundingClientRect();
+            const scaleX = game.canvas.width / rect.width;
+            game.touchX = (touch.clientX - rect.left) * scaleX;
         }
-        function updateHeartsDisplay() {
-            let html=''; for(let i=0;i<game.maxWrong;i++) html+= i<(game.maxWrong-game.wrongCount)?'<span class="heart">❤️</span>':'<span class="heart lost">🖤</span>';
-            document.getElementById('heartsDisplay').innerHTML=html;
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = game.canvas.getBoundingClientRect();
+            const scaleX = game.canvas.width / rect.width;
+            game.touchX = (touch.clientX - rect.left) * scaleX;
         }
-        function missionSuccess() { game.running=false; showScreen('resultScreen'); playSound(523,0.3,'sine'); }
-        function gameOver() { game.running=false; showScreen('resultScreen'); }
-        function restartLevel() { gameMode==='battle'?showWaitingRoom():startSoloGame(); }
-        function rematch() { if(isHost) roomRef.update({status:'waiting',questionIndex:0,questionOrder:[],'host/score':0,'host/streak':0,'guest/score':0,'guest/streak':0}); showWaitingRoom(); }
-        function exitBattle() { leaveRoom(); showScreen('loginScreen'); }
-        function leaveRoom() { if(roomListener) roomRef.off('value',roomListener); if(isHost && roomRef) roomRef.remove(); else if(roomRef) roomRef.child('guest').remove(); roomRef=null; isHost=false; }
-        function copyRoomCode() { navigator.clipboard.writeText(roomCode).then(()=>showFeedback('복사 완료!', '#4caf50')); }
-        
-        window.addEventListener('resize', () => { if(game.canvas) resizeCanvas(); });
-        window.addEventListener('beforeunload', leaveRoom);
+
+        function handleTouchEnd(e) {
+            game.touchX = null;
+            shoot();
+        }
+
+        // 창 크기 변경
+        window.addEventListener('resize', () => {
+            if (game.canvas) resizeCanvas();
+        });
+
+        // 페이지 종료 시 방 정리
+        window.addEventListener('beforeunload', () => {
+            leaveRoom();
+        });
     </script>
 </body>
 </html>
